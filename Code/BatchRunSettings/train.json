@@ -1,0 +1,18 @@
+[
+    [ "train.py",
+        {        
+            "save_name": "temp",
+            "model": "APMGSRN",
+            "data": "Plume.nc",
+            "n_features": 2,
+            "n_grids": 16,
+            "feature_grid_shape": "32,32,32",
+            "n_layers": 2,
+            "nodes_per_layer": 64,
+            "precondition": false,
+            "log_every": 100,
+            "log_features_every": 0,
+            "lr": 0.01,
+            "iterations": 10000
+    }]
+]

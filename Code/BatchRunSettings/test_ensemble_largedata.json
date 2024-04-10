@@ -1,0 +1,22 @@
+[
+    [ "test.py",
+        {        
+        "load_from": "Channel_APMGSRN_ensemble_medium",
+        "tests": "psnr"
+    }],
+    [ "test.py",
+        {        
+        "load_from": "Rotstrat_APMGSRN_ensemble_large",
+        "tests": "psnr"
+    }],
+    [ "test.py",
+        {        
+        "load_from": "Rotstrat_APMGSRN_ensemble_medium",
+        "tests": "psnr"
+    }],
+    [ "test.py",
+        {        
+        "load_from": "Rotstrat_APMGSRN_ensemble_small",
+        "tests": "psnr"
+    }]
+]

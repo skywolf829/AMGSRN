@@ -1,0 +1,7 @@
+[    
+    [ "test.py",
+        {        
+        "load_from": "temp",
+        "tests": "throughput,reconstruction,psnr"
+    }]
+]

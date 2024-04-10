@@ -1,0 +1,27 @@
+[
+    [ "test.py",
+        {        
+        "load_from": "Plume_APMGSRN_ensemble",
+        "tests": "psnr"
+    }],
+    [ "test.py",
+        {        
+        "load_from": "Asteroid_APMGSRN_ensemble",
+        "tests": "psnr"
+    }],
+    [ "test.py",
+        {        
+        "load_from": "Isotropic_APMGSRN_ensemble",
+        "tests": "psnr"
+    }],
+    [ "test.py",
+        {        
+        "load_from": "Nyx_APMGSRN_ensemble",
+        "tests": "psnr"
+    }],
+    [ "test.py",
+        {        
+        "load_from": "Supernova_APMGSRN_ensemble",
+        "tests": "psnr"
+    }]
+]
