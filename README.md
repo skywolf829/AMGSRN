@@ -1,2 +1,2 @@
-# AMGSRN-
+# AMGSRN
 Improvements over APMGSRN 
