@@ -240,7 +240,7 @@ def scale_distribution(model, opt):
 def test_throughput(model, opt):
 
     batch = 2**23
-    num_forward = 1000
+    num_forward = 100
 
     with torch.no_grad():
         input_data :torch.Tensor = torch.rand([batch, 3], device=opt['device'], dtype=torch.float32)

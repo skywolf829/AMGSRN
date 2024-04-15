@@ -45,6 +45,7 @@ class Options():
         opt['iterations']                           = 10000
         opt['points_per_iteration']                 = 100000   
         opt['lr']                                   = 0.01
+        opt['transform_lr']                         = 0.001
         opt['beta_1']                               = 0.9
         opt['beta_2']                               = 0.99
 

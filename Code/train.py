@@ -188,9 +188,8 @@ def train_step_APMGSRN(opt, iteration, batch, dataset, model, optimizer, schedul
     
     x = x.to(opt['device'])
     y = y.to(opt['device'])
-    
-    transformed_x = model.transform(x)    
-    model_output = model.forward_pre_transformed(transformed_x)
+      
+    model_output = model.forward(x)
     
     loss = F.mse_loss(model_output, y, reduction='none')
     loss = loss.sum(dim=1, keepdim=True)
@@ -204,7 +203,7 @@ def train_step_APMGSRN(opt, iteration, batch, dataset, model, optimizer, schedul
         not early_stop_grid):
         optimizer[1].zero_grad() 
         
-        density = model.feature_density_pre_transformed(transformed_x) 
+        density = model.feature_density(x) 
         
         density /= density.sum().detach()
         target = torch.exp(torch.log(density+1e-16) * \
@@ -219,26 +218,11 @@ def train_step_APMGSRN(opt, iteration, batch, dataset, model, optimizer, schedul
         density_loss.mean().backward()
         
         optimizer[1].step()
-        scheduler[1].step()   
+        scheduler[1].step(density_loss.mean())   
 
         early_stopping_grid_losses[iteration] = density_loss.mean().detach()
         if(iteration >= 2500):
-            prev_avg = early_stopping_grid_losses[iteration-2000:iteration-1000].mean()
-            current_avg = early_stopping_grid_losses[iteration-1000:iteration].mean()
-            
-            thresh = prev_avg * 1e-4
-            momentum_needed = 1
-            
-            # See if the slope is under the threshold
-            thresh_met = prev_avg - current_avg < thresh
-            
-            # a let the momentum of the grids finish for 1k more iterations
-            if(thresh_met):
-                early_stopping_grid_losses[-1] += 1
-            else:
-                early_stopping_grid_losses[-1] = 0
-                
-            early_stop_grid = thresh_met and early_stopping_grid_losses[-1] > momentum_needed 
+            early_stop_grid = optimizer[1].param_groups[0]['lr'] < opt['transform_lr'] * 0.5**5
             if(early_stop_grid):
                 print(f"Grid has converged. Setting early stopping flag.")
 
@@ -315,7 +299,7 @@ def train( model, dataset, opt):
                 ),
             optim.Adam(
                 model.get_transform_parameters(), 
-                lr=opt['lr'] * 0.05, 
+                lr=opt['transform_lr'],
                 betas=[opt['beta_1'], opt['beta_2']], eps = 10e-15
                 )
         ]        
@@ -323,8 +307,9 @@ def train( model, dataset, opt):
             torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer[0],
                 mode="min", patience=500, threshold=1e-4, threshold_mode="rel",
                 cooldown=250,factor=0.1,verbose=True),
-            torch.optim.lr_scheduler.LinearLR(optimizer[1], 
-                start_factor=1, end_factor=0.5)
+            torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer[1], 
+                mode="min", patience=500, threshold=1e-5, threshold_mode="rel",
+                cooldown=250,factor=0.5,verbose=True)
         ]      
         early_stopping_data = (False, False,
             torch.zeros([opt['iterations']], 

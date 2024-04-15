@@ -1,0 +1,36 @@
+Data: torch.Size([1, 1, 1000, 1000, 1000]) from full extents (1000, 1000, 1000). IO time loading data:  4.1237
+APMGSRN(
+  (encoder): APMG_encoder()
+  (decoder): Network(n_input_dims=32, n_output_dims=1, seed=1337, dtype=torch.float16, hyperparams={'encoding': {'offset': 0.0, 'otype': 'Identity', 'scale': 1.0}, 'network': {'activation': 'ReLU', 'n_hidden_layers': 2, 'n_neurons': 64, 'otype': 'FullyFusedMLP', 'output_activation': 'None'}, 'otype': 'NetworkWithInputEncoding'})
+)
+Training on cuda:0 C:\Users\Sky\Documents\GitHub\AMGSRN\Code\..\SavedModels\temp
+Iteration 0/50000, Fitting loss:  0.0460841 
+Iteration 50/50000, Fitting loss:  0.0363062 
+Iteration 100/50000, Fitting loss:  0.0345088 
+Iteration 150/50000, Fitting loss:  0.0346931 
+Iteration 200/50000, Fitting loss:  0.0353564 
+Iteration 250/50000, Fitting loss:  0.0363884 
+Iteration 300/50000, Fitting loss:  0.0362907 
+Iteration 350/50000, Fitting loss:  0.0358232 
+Iteration 400/50000, Fitting loss:  0.0360782 
+Iteration 450/50000, Fitting loss:  0.0361493 
+Iteration 500/50000, Fitting loss:  0.0361881 
+Iteration 550/50000, Fitting loss:  0.0363753 Grid loss:  0.0000189 
+Iteration 600/50000, Fitting loss:  0.0461838 Grid loss:  nan 
+Iteration 650/50000, Fitting loss:  0.0463569 Grid loss:  nan 
+Iteration 700/50000, Fitting loss:  0.0463539 Grid loss:  nan 
+Iteration 750/50000, Fitting loss:  0.0460349 Grid loss:  nan 
+Iteration 800/50000, Fitting loss:  0.0460866 Grid loss:  nan 
+Iteration 850/50000, Fitting loss:  0.0460680 Grid loss:  nan 
+Traceback (most recent call last):
+  File "C:\Users\Sky\Documents\GitHub\AMGSRN\Code\train.py", line 495, in <module>
+    train(model, dataset, opt)
+  File "C:\Users\Sky\Documents\GitHub\AMGSRN\Code\train.py", line 334, in train
+    early_stopping_data = train_step(opt,
+  File "C:\Users\Sky\Documents\GitHub\AMGSRN\Code\train.py", line 197, in train_step_APMGSRN
+    loss.mean().backward()
+  File "C:\Users\Sky\miniconda3\envs\AMGSRN\lib\site-packages\torch\_tensor.py", line 492, in backward
+    torch.autograd.backward(
+  File "C:\Users\Sky\miniconda3\envs\AMGSRN\lib\site-packages\torch\autograd\__init__.py", line 251, in backward
+    Variable._execution_engine.run_backward(  # Calls into the C++ engine to run the backward pass
+KeyboardInterrupt

@@ -4,6 +4,7 @@ import torch.nn.functional as F
 from Models.layers import ReLULayer
 from typing import List, Dict, Optional
 import math
+from AMG_Encoder import create_transformation_matrices, encode, feature_density
 
 def weights_init(m):
     classname = m.__class__.__name__
@@ -12,11 +13,32 @@ def weights_init(m):
         if(m.bias is not None):
             torch.nn.init.normal_(m.bias, 0, 0.001) 
 
-class APMG_encoder(nn.Module):
+@torch.jit.script
+def composite_transformation(rotations, scales, translations, transformation_matrix):
+    # grab useful quaternion values for later
+    x, y, z, w = rotations.unbind(-1)
+    x2, y2, z2 = x * x, y * y, z * z
+    wx, wy, wz = w * x, w * y, w * z
+    xy, xz, yz = x * y, x * z, y * z
+
+    # Create the transformation matrix
+    transformation_matrix[:, 0, 0] = scales[:, 0] * (1 - 2 * (y2 + z2))
+    transformation_matrix[:, 0, 1] = scales[:, 1] * (2 * (xy - wz))
+    transformation_matrix[:, 0, 2] = scales[:, 2] * (2 * (xz + wy))
+    transformation_matrix[:, 1, 0] = scales[:, 0] * (2 * (xy + wz))
+    transformation_matrix[:, 1, 1] = scales[:, 1] * (1 - 2 * (x2 + z2))
+    transformation_matrix[:, 1, 2] = scales[:, 2] * (2 * (yz - wx))
+    transformation_matrix[:, 2, 0] = scales[:, 0] * (2 * (xz - wy))
+    transformation_matrix[:, 2, 1] = scales[:, 1] * (2 * (yz + wx))
+    transformation_matrix[:, 2, 2] = scales[:, 2] * (1 - 2 * (x2 + y2))
+    transformation_matrix[:, :3, 3] = translations
+    return transformation_matrix
+
+class APMG_encoder_old(nn.Module):
     def __init__(self, n_grids:int, n_features:int,
                  feat_grid_shape:List[int], n_dims:int,
                  grid_initializaton:str):
-        super().__init__()
+        super(APMG_encoder_old, self).__init__()
              
         self.transformation_matrices = torch.nn.Parameter(
             torch.zeros(
@@ -42,7 +64,6 @@ class APMG_encoder(nn.Module):
         else:
             self.randomize_grids()
         
-
     def init_grids_large(self):  
         with torch.no_grad():     
             d = self.feature_grids.device
@@ -176,18 +197,13 @@ class APMG_encoder(nn.Module):
         transformed_points = x
             
         # get the coeffs of shape [n_grids], then unsqueeze to [1,n_grids] for broadcasting
-        coeffs = torch.linalg.det(self.transformation_matrices[:,0:-1,0:-1]).unsqueeze(0) \
-            / (2.0*torch.pi)**(x.shape[-1]/2)
-        #coeffs = torch.prod(self.grid_scales,dim=1).unsqueeze(0) \
-        #    / (2.0*torch.pi)**(x.shape[-1]/2)
-
+        coeffs = torch.linalg.det(self.transformation_matrices[:,0:-1,0:-1]).unsqueeze(0)
+        
         # sum the exp part to [batch,n_grids]
-        exps = torch.exp(-0.5 * \
+        exps = torch.exp(-1 * \
             torch.sum(
                 transformed_points.transpose(0,1)**20, 
             dim=-1))
-        # Another similar solution, may or may not be more efficient gradient computation 
-        #exps = 1 / (1 + torch.sum(local_positions**20,dim=-1))
         
         result = torch.sum(coeffs * exps, dim=-1, keepdim=True)
         return result
@@ -219,9 +235,135 @@ class APMG_encoder(nn.Module):
         x = self.transform(x)
         return self.forward_pre_transformed(x)
 
+class APMG_encoder(nn.Module):
+    def __init__(self, n_grids:int, n_features:int,
+                 feat_grid_shape:List[int], n_dims:int,
+                 grid_initializaton:str = None):
+        super(APMG_encoder, self).__init__()
+
+        self.init_activations()
+        self.randomize_grids(n_grids, n_features, feat_grid_shape, n_dims)
+        
+    def init_activations(self):
+        self.scale_activation = torch.exp
+        self.inv_scale_activation = torch.log
+        self.rotation_activation = torch.nn.functional.normalize
+
+    def randomize_grids(self, n_grids:int, n_features:int,
+                 feat_grid_shape:List[int], n_dims:int):  
+        with torch.no_grad():     
+            d = "cpu"
+            s = torch.ones([n_grids, n_dims], dtype=torch.float32, device = d)
+            s += torch.rand_like(s)*0.05
+            s = self.inv_scale_activation(s)
+            r = torch.zeros([n_grids, 4], dtype=torch.float32, device = d)
+            r[:,-1] = 1.0
+            t = torch.zeros([n_grids, n_dims], dtype=torch.float32, device = d)
+            t += torch.rand_like(t)*0.05
+            
+        self._scales = torch.nn.Parameter(s,requires_grad=True)   
+        self._rotations = torch.nn.Parameter(r,requires_grad=True)   
+        self.translations = torch.nn.Parameter(t,requires_grad=True)   
+
+        self.feature_grids =  torch.nn.parameter.Parameter(
+            torch.ones(
+                [n_grids, n_features] + feat_grid_shape,
+                dtype=torch.float32
+            ).uniform_(-0.0001, 0.0001),
+            requires_grad=True
+        )
+
+    @property
+    def scales(self):
+        return self.scale_activation(self._scales)
+    
+    @property
+    def rotations(self):
+        return self.rotation_activation(self._rotations)
+
+    @property
+    def transformation_matrices(self):
+        return create_transformation_matrices(self.rotations, self.scales, self.translations)
+
+    
+    def transform(self, x):
+        '''
+        Transforms global coordinates x to local coordinates within
+        each feature grid, where feature grids are assumed to be on
+        the boundary of [-1, 1]^n_dims in their local coordinate system.
+        Scales the grid by a factor to match the gaussian shape
+        (see feature_density_gaussian()). Assumes S*R*T order
+        
+        x: Input coordinates with shape [batch, n_dims]
+        returns: local coordinates in a shape [n_grids, batch, n_dims]
+        '''
+                
+        # x starts [batch,n_dims], this changes it to [n_grids,batch,n_dims+1]
+        # by appending 1 to the xy(z(t)) and repeating it n_grids times
+        
+        batch : int = x.shape[0]
+        dims : int = x.shape[1]
+        ones = torch.ones([batch, 1], 
+            device=x.device,
+            dtype=torch.float32)
+            
+        x = torch.cat([x, ones], dim=1)
+        #x = x.unsqueeze(0)
+        #x = x.repeat(self.feature_grids.shape[0], 1, 1)
+        
+        # BMM will result in [n_grids,n_dims+1,n_dims+1] x [n_grids,n_dims+1,batch]
+        # which returns [n_grids,n_dims+1,batch], which is then transposed
+        # to [n_grids,batch,n_dims+1]
+        #transformed_points = torch.bmm(self.transformation_matrices, 
+        #                    x.transpose(1, 2)).transpose(1, 2)
+        transformed_points = torch.matmul(self.transformation_matrices, 
+                            x.transpose(0, 1)).transpose(1, 2)
+        transformed_points = transformed_points[...,0:dims]
+        
+        # return [n_grids,batch,n_dims]
+        return transformed_points
+   
+    def inverse_transform(self, x):
+        '''
+        Transforms local coordinates within each feature grid x to 
+        global coordinates. Scales local coordinates by a factor
+        so as to be consistent with the transform() method, which
+        attempts to align feature grids with the guassian density 
+        calculated in feature_density_gaussian().Assumes S*R*T order,
+        so inverse is T^(-1)*R^T*(1/S)
+        
+        x: Input coordinates with shape [batch, n_dims]
+        returns: local coordinates in a shape [n_grids, batch, n_dims]
+        '''
+
+        local_to_global_matrices = torch.linalg.inv(self.transformation_matrices)
+       
+        batch : int = x.shape[0]
+        dims : int = x.shape[1]
+        ones = torch.ones([batch, 1], 
+            device=x.device,
+            dtype=torch.float32)
+        
+        x = torch.cat([x, ones], dim=1)
+        #x = x.unsqueeze(0)
+        #x = x.repeat(n_grids, 1, 1)
+        
+        transformed_points = torch.matmul(local_to_global_matrices,
+            x.transpose(0,1)).transpose(1, 2)
+        transformed_points = transformed_points[...,0:dims]
+
+        return transformed_points
+    
+    def feature_density(self, x):
+        return feature_density(x, self.rotations, self.scales, self.translations)  
+     
+    def forward(self, x):
+        return encode(x, self.rotations, self.scales, self.translations, self.feature_grids)
+
+
 class APMGSRN(nn.Module):
     def __init__(self, opt):
-        super().__init__()
+        super(APMGSRN, self).__init__()
         
         self.n_grids : int = opt['n_grids']
         self.n_features : int = opt['n_features'] 
@@ -240,11 +382,12 @@ class APMGSRN(nn.Module):
         self.encoder = APMG_encoder(opt['n_grids'], opt['n_features'] , 
             self.feature_grid_shape, opt['n_dims'], opt['grid_initialization'])
         
+        
         def init_decoder_tcnn():
             import tinycudann as tcnn 
-            input_size:int = opt['n_features'] *opt['n_grids'] # + 6*3*2
+            input_size:int = opt['n_features']*opt['n_grids'] # + 6*3*2
             if(opt['requires_padded_feats']):
-                input_size = opt['n_features'] *opt['n_grids'] + self.padding_size
+                input_size = opt['n_features']*opt['n_grids'] + self.padding_size
                 
             decoder = tcnn.Network(
                 n_input_dims=input_size,
@@ -263,9 +406,9 @@ class APMGSRN(nn.Module):
         def init_decoder_pytorch():
             decoder = nn.ModuleList()   
             
-            first_layer_input_size:int = opt['n_features'] *opt['n_grids'] # + 6*3*2
+            first_layer_input_size:int = opt['n_features']*opt['n_grids'] # + 6*3*2
             if(opt['requires_padded_feats']):
-                first_layer_input_size = opt['n_features'] *opt['n_grids'] + self.padding_size
+                first_layer_input_size = opt['n_features']*opt['n_grids'] + self.padding_size
                                            
             layer = ReLULayer(first_layer_input_size, 
                 opt['nodes_per_layer'], bias=opt['use_bias'], dtype=torch.float32)
@@ -282,7 +425,7 @@ class APMGSRN(nn.Module):
                     decoder.append(layer)
             decoder = torch.nn.Sequential(*decoder)
             return decoder
-             
+        
         if(opt['use_tcnn_if_available']):
             try:
                 self.decoder = init_decoder_tcnn()
@@ -291,7 +434,7 @@ class APMGSRN(nn.Module):
                 self.decoder = init_decoder_pytorch()
         else:                
             self.decoder = init_decoder_pytorch()
-
+        
         self.reset_parameters()
     
         self.register_buffer(
@@ -306,6 +449,11 @@ class APMGSRN(nn.Module):
         )
 
     def get_transform_parameters(self):
+        return [{"params": self.encoder._rotations},
+                {"params": self.encoder._scales},
+                {"params": self.encoder.translations}]
+    
+    def get_transform_parameters_old(self):
         return [{"params": self.encoder.transformation_matrices}]
     
     def get_model_parameters(self):
@@ -329,10 +477,6 @@ class APMGSRN(nn.Module):
             )
             self.decoder.apply(weights_init)   
 
-    def feature_density_pre_transformed(self, x):
-        return self.encoder.feature_density_pre_transformed(x)
-
-    @torch.jit.export
     def feature_density(self, x):
         return self.encoder.feature_density(x)
 
@@ -361,17 +505,11 @@ class APMGSRN(nn.Module):
     def max(self):
         return self.volume_max
 
-    def forward_pre_transformed(self, x):
-        feats = self.encoder.forward_pre_transformed(x)    
-        if(self.requires_padded_feats):
-            feats = F.pad(feats, (0, self.padding_size), value=1.0) 
-        y = self.decoder(feats)
-        y = y.float() * (self.volume_max - self.volume_min) + self.volume_min     
-        return y
-
     def forward(self, x):
-        x_t = self.encoder.transform(x)
-        return self.forward_pre_transformed(x_t)   
+        feats = self.encoder.forward(x)   
+        y = self.decoder(feats)
+        y = y.float() * (self.volume_max - self.volume_min) + self.volume_min   
+        return y
 
 # Works, but is slower and less accurate the the PyTorch version. 
 # May provide a useful speed-up in the future if fixed.
