@@ -56,7 +56,8 @@ torch::Tensor encode_forward(
     const torch::Tensor& rotations, 
     const torch::Tensor& scales, 
     const torch::Tensor& translations,
-    const torch::Tensor& feature_grids)
+    const torch::Tensor& feature_grids,
+    const int feature_vector_length)
 {
     // Get size information from the tensors
     const auto num_points = query_points.size(0);
@@ -69,13 +70,14 @@ torch::Tensor encode_forward(
     auto float_opts = query_points.options().dtype(torch::kFloat32);
 
     // Create temporary array for rotation matrices and output tensor
-    torch::Tensor out_features = torch::empty({num_points, num_grids*features_per_grid}, float_opts);
+    torch::Tensor out_features = torch::zeros({num_points, feature_vector_length}, float_opts);
 
     launch_encode_forward(
         num_points,
         num_grids,
         features_per_grid,
         D, H, W, 
+        feature_vector_length,
         query_points.contiguous().data_ptr<float>(), 
         rotations.contiguous().data_ptr<float>(),
         scales.contiguous().data_ptr<float>(), 
@@ -102,6 +104,7 @@ torch::Tensor encode_backward(
     const auto D = feature_grids.size(2);
     const auto H = feature_grids.size(3);
     const auto W = feature_grids.size(4);    
+    const int feature_vector_length = dL_dFeatureVectors.size(1);
 
     auto float_opts = query_points.options().dtype(torch::kFloat32);
 
@@ -113,6 +116,7 @@ torch::Tensor encode_backward(
         num_grids,
         features_per_grid,
         D, H, W, 
+        feature_vector_length,
         query_points.contiguous().data_ptr<float>(), 
         rotations.contiguous().data_ptr<float>(),
         scales.contiguous().data_ptr<float>(), 

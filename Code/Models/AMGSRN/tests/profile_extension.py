@@ -141,7 +141,6 @@ def timing_test_density_PyTorch(points, model, n_points, num_cycles):
     print()
     print()
 
-
 def nsight_profile(model, points):
     
     model_out = model(points)
@@ -156,12 +155,13 @@ def nsight_profile(model, points):
     
 
 class AMGSRN(torch.nn.Module):
-    def __init__(self, n_grids, feats_per_grid, feat_grid_dim):
+    def __init__(self, n_grids, feats_per_grid, feat_grid_dim, feature_vector_length):
         super(AMGSRN, self).__init__()
         r, s, t = get_random_rst(n_grids)
         features = get_random_feature_grids(n_grids, feats_per_grid, feat_grid_dim)
+        self.feature_vector_length = feature_vector_length
         self.decoder = tcnn.Network(
-            n_input_dims=feats_per_grid*n_grids,
+            n_input_dims=feature_vector_length,
             n_output_dims=1 ,
             network_config={
                 "otype": "FullyFusedMLP",
@@ -183,10 +183,11 @@ class AMGSRN(torch.nn.Module):
         return feature_density_pytorch(points, self.r, self.s, self.t) 
     
     def forward_cuda(self, x):
-        return self.decoder(encode(x, self.r, self.s, self.t, self.features)).float()
+        feats = encode(x, self.r, self.s, self.t, self.features, self.feature_vector_length)
+        return self.decoder(feats).float()
     
     def forward_pytorch(self, x):
-        return self.decoder(encode_pytorch(self.features, self.r, self.s, self.t, x)).float()
+        return self.decoder(encode_pytorch(self.features, self.r, self.s, self.t, x, self.feature_vector_length)).float()
     
     def forward(self, x):
         return self.forward_cuda(x)
@@ -245,15 +246,16 @@ if __name__ == "__main__":
     num_cycles = 10
 
     # Hyperparams
-    n_grids = 32
-    feats_per_grid = 2
-    feat_grid_dim = [32, 32, 32]
+    n_grids = 128
+    feats_per_grid = 1
+    feature_vector_length = 32
+    feat_grid_dim = [16, 16, 16]
     n_points = 2**23
 
    
     # Setup model
     points = get_random_points(n_points)
-    model = AMGSRN(n_grids, feats_per_grid, feat_grid_dim)
+    model = AMGSRN(n_grids, feats_per_grid, feat_grid_dim, feature_vector_length)
     
     #nsight_profile(model, points)
     profile_efficiency_forward(points, model, n_points, num_cycles)

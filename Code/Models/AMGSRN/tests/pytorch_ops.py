@@ -47,8 +47,9 @@ def transform_points(transformation_matrices:torch.Tensor, points:torch.Tensor) 
     return transformed_points
 
 def encode_pytorch(feature_grids:torch.Tensor, rotations:torch.Tensor, scales:torch.Tensor, 
-                   translations:torch.Tensor, query_positions:torch.Tensor) -> torch.tensor:
-
+                   translations:torch.Tensor, query_positions:torch.Tensor, feature_vector_length: int = None) -> torch.tensor:
+    if feature_vector_length is None:
+        feature_vector_length = feature_grids.shape[0]*feature_grids.shape[1]
     matrices = composite_transformation(rotations, scales, translations)
     x = transform_points(matrices, query_positions)
     grids : int = x.shape[0]
@@ -56,13 +57,12 @@ def encode_pytorch(feature_grids:torch.Tensor, rotations:torch.Tensor, scales:to
     dims : int = x.shape[2]        
     x = x.reshape(grids, 1, 1, batch, dims)
     
-    
     # Sample the grids at the batch of transformed point locations
     # Uses zero padding, so any point outside of [-1,1]^n_dims will be a 0 feature vector
     feats = F.grid_sample(feature_grids, x,
         mode='bilinear', align_corners=True,
         padding_mode="zeros").flatten(0, dims).permute(1,0)
-    
+    feats = feats.reshape(feats.shape[0], feature_vector_length, -1).sum(dim=-1)
     return feats
 
 def feature_density_pytorch(query_points:torch.Tensor, rotations:torch.Tensor, scales:torch.Tensor, translations:torch.Tensor) -> torch.Tensor:

@@ -23,6 +23,8 @@ __device__ void trilinearInterpolate(
     const int H,
     const int W,
     const float3 point,
+    const int start_out_ind,
+    const int feature_vector_length,
     float* output) {
 
     // Follows align_corners=True from Torch
@@ -33,7 +35,6 @@ __device__ void trilinearInterpolate(
     
     // 0 if truly out of bounds including zero padding
     if(x <= -1 || y <= -1 || z <= -1 || x >= W || y >= H || z >= D){
-        for(int i = 0; i<C;++i) output[i] = 0.f;
         return;
     }
     int x0 = floor(x);
@@ -54,18 +55,16 @@ __device__ void trilinearInterpolate(
     bool z0_in = (z0 != -1);
     bool z1_in = (z1 != D);
 
-    // Iterate over each channel
-    for(int i = 0; i < C; ++i){
-        // Fetch the 8 grid values at corner points
-        auto g = i*D*H*W;
-        float c000 = z0_in && y0_in && x0_in ? grid[g + z0 * H * W + y0 * W + x0] : 0;
-        float c001 = z0_in && y0_in && x1_in ? grid[g + z0 * H * W + y0 * W + x1] : 0;
-        float c010 = z0_in && y1_in && x0_in ? grid[g + z0 * H * W + y1 * W + x0] : 0;
-        float c011 = z0_in && y1_in && x1_in ? grid[g + z0 * H * W + y1 * W + x1] : 0;
-        float c100 = z1_in && y0_in && x0_in ? grid[g + z1 * H * W + y0 * W + x0] : 0;
-        float c101 = z1_in && y0_in && x1_in ? grid[g + z1 * H * W + y0 * W + x1] : 0;
-        float c110 = z1_in && y1_in && x0_in ? grid[g + z1 * H * W + y1 * W + x0] : 0;
-        float c111 = z1_in && y1_in && x1_in ? grid[g + z1 * H * W + y1 * W + x1] : 0;
+    for(auto i = 0; i < C; ++i){
+        auto o = i*H*W*D;
+        float c000 = z0_in && y0_in && x0_in ? grid[o + z0 * H * W + y0 * W + x0] : 0;
+        float c001 = z0_in && y0_in && x1_in ? grid[o + z0 * H * W + y0 * W + x1] : 0;
+        float c010 = z0_in && y1_in && x0_in ? grid[o + z0 * H * W + y1 * W + x0] : 0;
+        float c011 = z0_in && y1_in && x1_in ? grid[o + z0 * H * W + y1 * W + x1] : 0;
+        float c100 = z1_in && y0_in && x0_in ? grid[o + z1 * H * W + y0 * W + x0] : 0;
+        float c101 = z1_in && y0_in && x1_in ? grid[o + z1 * H * W + y0 * W + x1] : 0;
+        float c110 = z1_in && y1_in && x0_in ? grid[o + z1 * H * W + y1 * W + x0] : 0;
+        float c111 = z1_in && y1_in && x1_in ? grid[o + z1 * H * W + y1 * W + x1] : 0;
 
         // Interpolate
         float c00 = c000 * (1 - xd) + c001 * xd;
@@ -77,7 +76,7 @@ __device__ void trilinearInterpolate(
         float c1 = c10 * (1 - yd) + c11 * yd;
 
         float c = c0 * (1 - zd) + c1 * zd;
-        output[i] = c;
+        atomicAdd(&output[(start_out_ind + i) % feature_vector_length], c);
     }
 }
 
@@ -87,6 +86,8 @@ __device__ void trilinearInterpolateBackwards(
     const int D, 
     const int H,
     const int W,
+    const int feature_vector_length,
+    const int grid_idx,
     const float3 point,
     const float* dL_dFeatureVector) {
 
@@ -121,7 +122,7 @@ __device__ void trilinearInterpolateBackwards(
 
     // Iterate over each channel
     for(int i = 0; i < C; ++i){
-        float dL_dFeat = dL_dFeatureVector[i];
+        float dL_dFeat = dL_dFeatureVector[(grid_idx*C+i)%feature_vector_length];
         // Fetch the 8 grid values at corner points
         if(z0_in && y0_in && x0_in) atomicAdd(&dL_dFeatureGrids[i*D*H*W + z0*H*W + y0*W + x0], dL_dFeat*(1-xd)*(1 - yd)*(1-zd));
         if(z0_in && y0_in && x1_in) atomicAdd(&dL_dFeatureGrids[i*D*H*W + z0*H*W + y0*W + x1], dL_dFeat*xd*(1 - yd)*(1-zd));
@@ -141,28 +142,39 @@ __global__ void encodeForwardKernel(
     const int D, 
     const int H, 
     const int W,
+    const int feature_vector_length,
     const float* __restrict__ query_points, 
-    const float *rotation_matrices, 
-    const float *translations,
-    const float *feature_grids, 
-    float*__restrict__ output_features) {
+    const float* rotation_matrices, 
+    const float* translations,
+    const float* __restrict__ feature_grids, 
+    float* output_features) {
 
+    extern __shared__ float sharedGridData[];
 
     auto idx = blockIdx.x * blockDim.x + threadIdx.x;
     auto grid_idx = blockIdx.y;
+
+    __syncthreads();
+    for(auto i = threadIdx.x; i < features_per_grid*D*H*W; i += THREADS_PER_BLOCK){
+        auto s = grid_idx*features_per_grid*D*H*W + i;
+        sharedGridData[i] = feature_grids[s];
+    }
+    __syncthreads();
     if (idx >= num_points) return;
 
     // Grab the query point into local registers
     float3 point = make_float3(query_points[3 * idx],
-                    query_points[3 * idx + 1], 
-                    query_points[3 * idx + 2]);
+        query_points[3 * idx + 1], 
+        query_points[3 * idx + 2]);
 
     // Transform the point into local space for the grid using pre-computed rotation matrix
     float3 point_t = transformPoint(&rotation_matrices[9*grid_idx], &translations[3*grid_idx], point);
     // Perform feature grid trilinear interpolation and write the result directly to the output
-    trilinearInterpolate(&feature_grids[grid_idx*features_per_grid*D*H*W], 
-        features_per_grid, D, H, W, point_t, 
-        &output_features[idx*num_grids*features_per_grid + features_per_grid*grid_idx]);
+    trilinearInterpolate(sharedGridData, 
+        features_per_grid,
+        D, H, W, point_t, 
+        grid_idx*features_per_grid%feature_vector_length, feature_vector_length,
+        &output_features[idx*feature_vector_length]);
     
 }
 
@@ -173,11 +185,12 @@ __global__ void encodeBackwardKernel(
     const int D, 
     const int H, 
     const int W,
+    const int feature_vector_length,
     const float* __restrict__ query_points, 
     const float* rotation_matrices, 
     const float* translations,
     const float* feature_grids, 
-    const float* dL_dFeatureVectors, 
+    const float* __restrict__ dL_dFeatureVectors, 
     float* dL_dFeatureGrids) {
     
     auto idx = blockIdx.x * blockDim.x + threadIdx.x;
@@ -191,8 +204,8 @@ __global__ void encodeBackwardKernel(
     float3 point_t = transformPoint(&rotation_matrices[9*grid_idx], &translations[3*grid_idx], point);
     // Perform feature grid trilinear interpolation and write the result directly to the output
     trilinearInterpolateBackwards(&dL_dFeatureGrids[grid_idx*features_per_grid*D*H*W], 
-        features_per_grid, D, H, W, point_t, 
-        &dL_dFeatureVectors[idx*num_grids*features_per_grid + features_per_grid*grid_idx]
+        features_per_grid, D, H, W, feature_vector_length, grid_idx, point_t, 
+        &dL_dFeatureVectors[idx*feature_vector_length]
     );
     
 }
@@ -619,6 +632,7 @@ void launch_encode_forward(
     const int D, 
     const int H, 
     const int W,
+    const int feature_vector_length,
     const float* query_points, 
     const float* rotations, 
     const float* scales, 
@@ -640,11 +654,12 @@ void launch_encode_forward(
 
     dim3 gridDims((num_points + THREADS_PER_BLOCK - 1) / THREADS_PER_BLOCK, num_grids);
     // Next, perform interpolation
-    encodeForwardKernel<<<gridDims, THREADS_PER_BLOCK>>>(
+    encodeForwardKernel<<<gridDims, THREADS_PER_BLOCK, sizeof(float)*D*H*W*features_per_grid>>>(
         num_points, 
         num_grids, 
         features_per_grid,
         D, H, W,
+        feature_vector_length,
         query_points, 
         rotation_matrices, 
         translations,
@@ -661,6 +676,7 @@ void launch_encode_backward(
     const int D, 
     const int H, 
     const int W,
+    const int feature_vector_length,
     const float* query_points, 
     const float* rotations, 
     const float* scales, 
@@ -688,6 +704,7 @@ void launch_encode_backward(
         num_grids, 
         features_per_grid,
         D, H, W,
+        feature_vector_length,
         query_points, 
         rotation_matrices, 
         translations,

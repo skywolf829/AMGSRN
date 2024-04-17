@@ -23,11 +23,12 @@ class CreateTransformationMatricesFunction(torch.autograd.Function):
 
 class EncodeCoordinates(torch.autograd.Function):
     @staticmethod
-    def forward(ctx, query_coordinates, rotations, scales, translations, feature_grids):
+    def forward(ctx, query_coordinates, rotations, scales, translations, feature_grids, feature_vector_length):
 
         # Assuming create_transformation_matrices is your compiled CUDA function for forward pass
         feature_vectors = _C.encodeForward(query_coordinates, rotations, 
-                                           scales, translations, feature_grids)
+                                           scales, translations, feature_grids,
+                                           feature_vector_length)
 
         # Store for use in backward
         ctx.save_for_backward(query_coordinates, rotations, 
@@ -43,7 +44,7 @@ class EncodeCoordinates(torch.autograd.Function):
         # Assuming create_transformation_matrices_backward is your compiled CUDA function for backward pass
         grad_feature_grids = _C.encodeBackward(query_coordinates, 
             rotations, scales, translations, feature_grids, grad_output)
-        return None, None, None, None, grad_feature_grids
+        return None, None, None, None, grad_feature_grids, None
 
 class FeatureDensity(torch.autograd.Function):
     @staticmethod
@@ -74,9 +75,11 @@ class FeatureDensity(torch.autograd.Function):
 def create_transformation_matrices(rotations, scales, translations) -> torch.Tensor:
     return CreateTransformationMatricesFunction.apply(rotations, scales, translations)
 
-def encode(query_coordinates, rotations, scales, translations, feature_grids) -> torch.Tensor:
+def encode(query_coordinates, rotations, scales, translations, feature_grids, feature_vector_length=None) -> torch.Tensor:
+    if(feature_vector_length is None):
+        feature_vector_length = feature_grids.shape[0]*feature_grids.shape[1]
     return EncodeCoordinates.apply(query_coordinates, 
-        rotations, scales, translations, feature_grids)
+        rotations, scales, translations, feature_grids, feature_vector_length)
 
 def feature_density(query_coordinates, rotations, scales, translations) -> torch.Tensor:
     return FeatureDensity.apply(query_coordinates, 
