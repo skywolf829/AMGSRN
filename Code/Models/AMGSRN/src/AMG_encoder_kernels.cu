@@ -290,28 +290,17 @@ __global__ void densityBackwardKernel(
         // Only process if the threadID is within the num_points
         if (idx < num_points){
             // Manual point transformation
-            float tx = R[o] * point.x + 
-                        R[o + 1] * point.y + 
-                        R[o + 2] * point.z + T[3*i + 0];
-            float ty = R[o + 3] * point.x + 
-                        R[o + 4] * point.y + 
-                        R[o + 5] * point.z + T[3*i + 1];
-            float tz = R[o + 6] * point.x + 
-                        R[o + 7] * point.y + 
-                        R[o + 8] * point.z + T[3*i + 2];
-
-            // TODO - negative tx issue
-            // Maybe powf(powf(tx, 10), 2)?
+            float3 point_t = transformPoint(&R[o], &T[3*i], point);
 
             float det = R[o + 0] * (R[o + 4]*R[o + 8]-R[o + 5]*R[o + 7]) -
                     R[o + 1] * (R[o + 3]*R[o + 8]-R[o + 5]*R[o + 6]) +
                     R[o + 2] * (R[o + 3]*R[o + 7]-R[o + 4]*R[o + 6]); 
             
-            float tx19 = powf(tx, 19);
-            float ty19 = powf(ty, 19);
-            float tz19 = powf(tz, 19); 
+            float tx19 = powf(point_t.x, 19);
+            float ty19 = powf(point_t.y, 19);
+            float tz19 = powf(point_t.z, 19); 
 
-            float g = expf(-(powf(tx, 20) + powf(ty, 20) + powf(tz, 20)));
+            float g = expf(-(powf(point_t.x, 20) + powf(point_t.y, 20) + powf(point_t.z, 20)));
             float det20g = -20.f * det * g;
 
             //0-8 is rotation matrix grads, 9-12 is translation
@@ -731,7 +720,7 @@ void launch_density_forward(
     );
 
     blocksPerGrid = (num_points + THREADS_PER_BLOCK - 1) / THREADS_PER_BLOCK;
-    densityForwardKernel<<<blocksPerGrid, THREADS_PER_BLOCK, num_grids*12>>>(
+    densityForwardKernel<<<blocksPerGrid, THREADS_PER_BLOCK, num_grids*12*sizeof(float)>>>(
         num_points,
         num_grids,
         query_points,
@@ -772,7 +761,7 @@ void launch_density_backward(
     );
 
     blocksPerGrid = (num_points + THREADS_PER_BLOCK - 1) / THREADS_PER_BLOCK;
-    densityBackwardKernel<<<blocksPerGrid, THREADS_PER_BLOCK, num_grids*12>>>(
+    densityBackwardKernel<<<blocksPerGrid, THREADS_PER_BLOCK, num_grids*12*sizeof(float)>>>(
         num_points,
         num_grids,
         query_points,

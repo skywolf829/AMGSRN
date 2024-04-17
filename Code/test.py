@@ -242,6 +242,10 @@ def test_throughput(model, opt):
     batch = 2**23
     num_forward = 100
 
+    torch.cuda.empty_cache()
+    torch.cuda.reset_accumulated_memory_stats()
+    torch.cuda.reset_peak_memory_stats()
+
     with torch.no_grad():
         input_data :torch.Tensor = torch.rand([batch, 3], device=opt['device'], dtype=torch.float32)
 
@@ -260,7 +264,7 @@ def test_throughput(model, opt):
     print(f"Throughput: {points_queried/passed_time} points per second")
     GBytes = (torch.cuda.max_memory_allocated(device=opt['device']) \
                 / (1024**3))
-    print(f"{GBytes : 0.02f}GB of memory used (max reserved) during test.")
+    print(f"{GBytes : 0.02f}GB of memory used during test.")
 
 def feature_density(model, opt):
     

@@ -829,7 +829,7 @@ class TestFeatureDensity(unittest.TestCase):
         torch.testing.assert_close(grad_s_cuda, grad_s_torch, rtol=1e-4, atol=1e-8)
         torch.testing.assert_close(grad_t_cuda, grad_t_torch, rtol=1e-4, atol=1e-8)
 
-    def test_backward_batch_multigrid(self):
+    def test_backward_batch_multigrid_1(self):
         num_grids = 16
         r,s,t = get_random_rst(num_grids)
         points = get_random_points(2**20)
@@ -862,6 +862,74 @@ class TestFeatureDensity(unittest.TestCase):
         torch.testing.assert_close(grad_r_cuda, grad_r_torch, rtol=1e-4, atol=1e-6)
         torch.testing.assert_close(grad_s_cuda, grad_s_torch, rtol=1e-4, atol=1e-6)
         torch.testing.assert_close(grad_t_cuda, grad_t_torch, rtol=1e-4, atol=1e-6)
+
+    def test_backward_batch_multigrid_2(self):
+        num_grids = 32
+        r,s,t = get_random_rst(num_grids)
+        points = get_random_points(2**20)
+
+        m_torch = feature_density_pytorch(points, r, s, t)
+        l_torch = (m_torch**2).sum()
+        l_torch.backward()
+        grad_r_torch = r.grad.clone().detach()
+        grad_s_torch = s.grad.clone().detach()
+        grad_t_torch = t.grad.clone().detach()
+
+        r.grad = None
+        s.grad = None
+        t.grad = None
+
+        m_cuda = feature_density(points, r, s, t)
+        l_cuda = (m_cuda**2).sum()
+        l_cuda.backward()
+        grad_r_cuda = r.grad.clone().detach()
+        grad_s_cuda = s.grad.clone().detach()
+        grad_t_cuda = t.grad.clone().detach()
+
+        # Verify
+        print(grad_r_cuda)
+        print(grad_r_torch)
+        print(grad_s_cuda)
+        print(grad_s_torch)
+        print(grad_t_cuda)
+        print(grad_t_torch)
+        torch.testing.assert_close(grad_r_cuda, grad_r_torch, rtol=1e-4, atol=1e-6)
+        torch.testing.assert_close(grad_s_cuda, grad_s_torch, rtol=1e-4, atol=1e-6)
+        torch.testing.assert_close(grad_t_cuda, grad_t_torch, rtol=1e-4, atol=1e-6)
+
+    def test_backward_batch_multigrid_3(self):
+        num_grids = 64
+        r,s,t = get_random_rst(num_grids)
+        points = get_random_points(2**20)
+
+        m_torch = feature_density_pytorch(points, r, s, t)
+        l_torch = (m_torch**2).sum()
+        l_torch.backward()
+        grad_r_torch = r.grad.clone().detach()
+        grad_s_torch = s.grad.clone().detach()
+        grad_t_torch = t.grad.clone().detach()
+
+        r.grad = None
+        s.grad = None
+        t.grad = None
+
+        m_cuda = feature_density(points, r, s, t)
+        l_cuda = (m_cuda**2).sum()
+        l_cuda.backward()
+        grad_r_cuda = r.grad.clone().detach()
+        grad_s_cuda = s.grad.clone().detach()
+        grad_t_cuda = t.grad.clone().detach()
+
+        # Verify
+        print(grad_r_cuda[38,2])
+        print(grad_r_torch[38,2])
+        #print(grad_s_cuda)
+        #print(grad_s_torch)
+        #print(grad_t_cuda)
+        #print(grad_t_torch)
+        torch.testing.assert_close(grad_r_cuda, grad_r_torch, rtol=1e-3, atol=1e-6)
+        torch.testing.assert_close(grad_s_cuda, grad_s_torch, rtol=1e-3, atol=1e-6)
+        torch.testing.assert_close(grad_t_cuda, grad_t_torch, rtol=1e-3, atol=1e-6)
 
 if __name__ == '__main__':
     unittest.main()
