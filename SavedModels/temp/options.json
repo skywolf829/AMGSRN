@@ -27,7 +27,7 @@
     "iterations": 50000,
     "iters_since_new_layer": 0,
     "iters_to_train_new_layer": 1000,
-    "log_every": 100,
+    "log_every": 50,
     "log_features_every": 500,
     "log_image": false,
     "log_image_every": 0,

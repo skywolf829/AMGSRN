@@ -93,7 +93,6 @@ torch::Tensor encode_backward(
     const torch::Tensor& scales, 
     const torch::Tensor& translations,
     const torch::Tensor& feature_grids,
-    const torch::Tensor& feature_vectors,
     const torch::Tensor& dL_dFeatureVectors)
 {
     // Get size information from the tensors
@@ -119,7 +118,7 @@ torch::Tensor encode_backward(
         scales.contiguous().data_ptr<float>(), 
         translations.contiguous().data_ptr<float>(), 
         feature_grids.contiguous().data_ptr<float>(), 
-        feature_vectors.contiguous().data_ptr<float>(),         
+        dL_dFeatureVectors.contiguous().data_ptr<float>(),         
         dL_dFeatureGrids.contiguous().data_ptr<float>()
     );
 
@@ -162,7 +161,7 @@ std::tuple<torch::Tensor, torch::Tensor, torch::Tensor> feature_density_backward
 
     torch::Tensor dL_dRotations = torch::empty({num_grids, 4}, float_opts);
     torch::Tensor dL_dScales = torch::empty({num_grids, 3}, float_opts);
-    torch::Tensor dL_dTranslations = torch::empty({num_grids, 3}, float_opts);
+    torch::Tensor dL_dTranslations = torch::zeros({num_grids, 3}, float_opts);
     
     launch_density_backward(
         num_points,

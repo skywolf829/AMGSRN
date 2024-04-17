@@ -285,7 +285,6 @@ class APMG_encoder(nn.Module):
     def transformation_matrices(self):
         return create_transformation_matrices(self.rotations, self.scales, self.translations)
 
-    
     def transform(self, x):
         '''
         Transforms global coordinates x to local coordinates within
@@ -297,10 +296,7 @@ class APMG_encoder(nn.Module):
         x: Input coordinates with shape [batch, n_dims]
         returns: local coordinates in a shape [n_grids, batch, n_dims]
         '''
-                
-        # x starts [batch,n_dims], this changes it to [n_grids,batch,n_dims+1]
-        # by appending 1 to the xy(z(t)) and repeating it n_grids times
-        
+                        
         batch : int = x.shape[0]
         dims : int = x.shape[1]
         ones = torch.ones([batch, 1], 
@@ -308,19 +304,10 @@ class APMG_encoder(nn.Module):
             dtype=torch.float32)
             
         x = torch.cat([x, ones], dim=1)
-        #x = x.unsqueeze(0)
-        #x = x.repeat(self.feature_grids.shape[0], 1, 1)
-        
-        # BMM will result in [n_grids,n_dims+1,n_dims+1] x [n_grids,n_dims+1,batch]
-        # which returns [n_grids,n_dims+1,batch], which is then transposed
-        # to [n_grids,batch,n_dims+1]
-        #transformed_points = torch.bmm(self.transformation_matrices, 
-        #                    x.transpose(1, 2)).transpose(1, 2)
         transformed_points = torch.matmul(self.transformation_matrices, 
                             x.transpose(0, 1)).transpose(1, 2)
         transformed_points = transformed_points[...,0:dims]
         
-        # return [n_grids,batch,n_dims]
         return transformed_points
    
     def inverse_transform(self, x):
@@ -345,8 +332,6 @@ class APMG_encoder(nn.Module):
             dtype=torch.float32)
         
         x = torch.cat([x, ones], dim=1)
-        #x = x.unsqueeze(0)
-        #x = x.repeat(n_grids, 1, 1)
         
         transformed_points = torch.matmul(local_to_global_matrices,
             x.transpose(0,1)).transpose(1, 2)
@@ -480,11 +465,9 @@ class APMGSRN(nn.Module):
     def feature_density(self, x):
         return self.encoder.feature_density(x)
 
-    @torch.jit.export
     def transform(self, x):
         return self.encoder.transform(x)
     
-    @torch.jit.export
     def inverse_transform(self, x):
         return self.encoder.inverse_transform(x)
     
