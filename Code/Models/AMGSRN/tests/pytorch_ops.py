@@ -62,7 +62,7 @@ def encode_pytorch(feature_grids:torch.Tensor, rotations:torch.Tensor, scales:to
     feats = F.grid_sample(feature_grids, x,
         mode='bilinear', align_corners=True,
         padding_mode="zeros").flatten(0, dims).permute(1,0)
-    feats = feats.reshape(feats.shape[0], feature_vector_length, -1).sum(dim=-1)
+    feats = feats.reshape(feats.shape[0], -1, feature_vector_length).sum(dim=1)
     return feats
 
 def feature_density_pytorch(query_points:torch.Tensor, rotations:torch.Tensor, scales:torch.Tensor, translations:torch.Tensor) -> torch.Tensor:

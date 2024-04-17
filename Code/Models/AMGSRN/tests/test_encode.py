@@ -252,7 +252,7 @@ class TestEncode(unittest.TestCase):
         # Verify
         torch.testing.assert_close(out_feats_cuda, out_feats_torch, rtol=0.1, atol=1e-5)
 
-    def test_operation_wrap_features(self):
+    def test_operation_wrap_features_1(self):
         num_grids = 16
         num_points = 1
         feature_vector_length = 4
@@ -270,7 +270,7 @@ class TestEncode(unittest.TestCase):
         print(out_feats_torch)
         torch.testing.assert_close(out_feats_cuda, out_feats_torch, rtol=0.1, atol=1e-5)
 
-    def test_operation_wrap_features_random(self):
+    def test_operation_wrap_features_2(self):
         num_grids = 16
         num_points = 1
         feature_vector_length = 8
@@ -279,6 +279,102 @@ class TestEncode(unittest.TestCase):
         t = torch.tensor([[0., 0., 0.]], device='cuda', dtype=torch.float32).repeat(num_grids, 1)
         feature_grids = torch.arange(0, 16*16*16*num_grids, device="cuda", dtype=torch.float32).reshape(num_grids, 1, 16,16,16)
         points = torch.tensor([[-1, -1, -1]], device="cuda", dtype=torch.float32)
+        
+        out_feats_cuda = encode(points, r, s, t, feature_grids, feature_vector_length)
+        out_feats_torch = encode_pytorch(feature_grids, r, s, t, points, feature_vector_length)
+
+        # Verify
+        print(out_feats_cuda)
+        print(out_feats_torch)
+        torch.testing.assert_close(out_feats_cuda, out_feats_torch, rtol=0.1, atol=num_points*1e-6)
+
+    def test_operation_wrap_features_random_1(self):
+        num_grids = 16
+        num_points = 1
+        feature_vector_length = 8
+        r,s,t = get_random_rst(num_grids)
+        feature_grids = get_random_feature_grids(num_grids, 1, [16,16,16])
+        points = torch.tensor([[-1, -1, -1]], device="cuda", dtype=torch.float32)
+        
+        out_feats_cuda = encode(points, r, s, t, feature_grids, feature_vector_length)
+        out_feats_torch = encode_pytorch(feature_grids, r, s, t, points, feature_vector_length)
+
+        # Verify
+        print(out_feats_cuda)
+        print(out_feats_torch)
+        torch.testing.assert_close(out_feats_cuda, out_feats_torch, rtol=0.1, atol=num_points*1e-6)
+
+    def test_operation_wrap_features_random_2(self):
+        num_grids = 16
+        num_points = 1
+        feature_vector_length = 8
+        r,s,t = get_random_rst(num_grids)
+        feature_grids = get_random_feature_grids(num_grids, 1, [16,16,16])
+        points = get_random_points(num_points)
+        
+        out_feats_cuda = encode(points, r, s, t, feature_grids, feature_vector_length)
+        out_feats_torch = encode_pytorch(feature_grids, r, s, t, points, feature_vector_length)
+
+        # Verify
+        print(out_feats_cuda)
+        print(out_feats_torch)
+        torch.testing.assert_close(out_feats_cuda, out_feats_torch, rtol=0.1, atol=num_points*1e-6)
+
+    def test_operation_wrap_features_random_3(self):
+        num_grids = 16
+        num_points = 2**20
+        feature_vector_length = 8
+        r,s,t = get_random_rst(num_grids)
+        feature_grids = get_random_feature_grids(num_grids, 1, [16,16,16])
+        points = get_random_points(num_points)
+        
+        out_feats_cuda = encode(points, r, s, t, feature_grids, feature_vector_length)
+        out_feats_torch = encode_pytorch(feature_grids, r, s, t, points, feature_vector_length)
+
+        # Verify
+        print(out_feats_cuda)
+        print(out_feats_torch)
+        torch.testing.assert_close(out_feats_cuda, out_feats_torch, rtol=0.1, atol=num_points*1e-6)
+
+    def test_operation_wrap_features_random_4(self):
+        num_grids = 32
+        num_points = 2**20
+        feature_vector_length = 8
+        r,s,t = get_random_rst(num_grids)
+        feature_grids = get_random_feature_grids(num_grids, 1, [16,16,16])
+        points = get_random_points(num_points)
+        
+        out_feats_cuda = encode(points, r, s, t, feature_grids, feature_vector_length)
+        out_feats_torch = encode_pytorch(feature_grids, r, s, t, points, feature_vector_length)
+
+        # Verify
+        print(out_feats_cuda)
+        print(out_feats_torch)
+        torch.testing.assert_close(out_feats_cuda, out_feats_torch, rtol=0.1, atol=num_points*1e-6)
+
+    def test_operation_wrap_features_random_5(self):
+        num_grids = 32
+        num_points = 2**20
+        feature_vector_length = 1
+        r,s,t = get_random_rst(num_grids)
+        feature_grids = get_random_feature_grids(num_grids, 1, [16,16,16])
+        points = get_random_points(num_points)
+        
+        out_feats_cuda = encode(points, r, s, t, feature_grids, feature_vector_length)
+        out_feats_torch = encode_pytorch(feature_grids, r, s, t, points, feature_vector_length)
+
+        # Verify
+        print(out_feats_cuda)
+        print(out_feats_torch)
+        torch.testing.assert_close(out_feats_cuda, out_feats_torch, rtol=0.1, atol=num_points*1e-6)
+
+    def test_operation_wrap_features_random_6(self):
+        num_grids = 128
+        num_points = 2**20
+        feature_vector_length = 32
+        r,s,t = get_random_rst(num_grids)
+        feature_grids = get_random_feature_grids(num_grids, 1, [16,16,16])
+        points = get_random_points(num_points)
         
         out_feats_cuda = encode(points, r, s, t, feature_grids, feature_vector_length)
         out_feats_torch = encode_pytorch(feature_grids, r, s, t, points, feature_vector_length)

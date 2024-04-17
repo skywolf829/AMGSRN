@@ -173,8 +173,9 @@ __global__ void encodeForwardKernel(
     trilinearInterpolate(sharedGridData, 
         features_per_grid,
         D, H, W, point_t, 
-        grid_idx*features_per_grid%feature_vector_length, feature_vector_length,
+        grid_idx*features_per_grid, feature_vector_length,
         &output_features[idx*feature_vector_length]);
+        
     
 }
 
