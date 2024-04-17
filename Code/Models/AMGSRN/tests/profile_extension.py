@@ -124,44 +124,44 @@ class AMGSRN(torch.nn.Module):
         return self.forward_cuda(x)
 
 def profile_efficiency(points, model, n_points, num_cycles):
-    torch.cuda.memory._record_memory_history(max_entries=100000)
-    with profile(activities=[
+
+    '''with profile(activities=[
             torch.profiler.ProfilerActivity.CPU,
             torch.profiler.ProfilerActivity.CUDA,
         ],
         record_shapes=True,
         profile_memory=True,
         with_stack=True) as prof:
-
-        timing_test_forward_pass_PyTorch(points, model, n_points, num_cycles)
-        torch.cuda.empty_cache()
-        torch.cuda.reset_accumulated_memory_stats()
-        torch.cuda.reset_peak_memory_stats()
-        timing_test_forward_pass_CUDA(points, model, n_points, num_cycles)
-        torch.cuda.empty_cache()
-        torch.cuda.reset_accumulated_memory_stats()
-        torch.cuda.reset_peak_memory_stats()
-
+    '''
+    timing_test_forward_pass_PyTorch(points, model, n_points, num_cycles)
+    torch.cuda.empty_cache()
+    torch.cuda.reset_accumulated_memory_stats()
+    torch.cuda.reset_peak_memory_stats()
+    timing_test_forward_pass_CUDA(points, model, n_points, num_cycles)
+    torch.cuda.empty_cache()
+    torch.cuda.reset_accumulated_memory_stats()
+    torch.cuda.reset_peak_memory_stats()
+    '''
     print(prof.key_averages().table(sort_by="cuda_time_total", row_limit=10))
     prof.export_memory_timeline(f"profile.html", device="cuda:0")
     prof.export_chrome_trace("trace.json")
-    torch.cuda.memory._record_memory_history(enabled=None)
-    torch.cuda.memory._dump_snapshot("mem_dump")
+    '''
 
 if __name__ == "__main__":
     
     # Testing params
-    num_cycles = 1
+    num_cycles = 10
 
     # Hyperparams
-    n_grids = 32
+    n_grids = 16
     feats_per_grid = 2
-    feat_grid_dim = [64, 64, 64]
-    n_points = 2**20
+    feat_grid_dim = [32, 32, 32]
+    n_points = 2**24
 
    
     # Setup model
     points = get_random_points(n_points)
     model = AMGSRN(n_grids, feats_per_grid, feat_grid_dim)
     
-    nsight_profile(model, points)
+    #nsight_profile(model, points)
+    profile_efficiency(points, model, n_points, num_cycles)

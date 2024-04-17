@@ -80,3 +80,4 @@ def feature_density_pytorch(query_points:torch.Tensor, rotations:torch.Tensor, s
     
     result = torch.sum(coeffs * exps, dim=-1, keepdim=True)
     return result  
+
