@@ -1,0 +1,691 @@
+Data: torch.Size([1, 1, 1000, 1000, 1000]) from full extents (1000, 1000, 1000). IO time loading data:  4.0271
+APMGSRN(
+  (encoder): APMG_encoder()
+  (decoder): Network(n_input_dims=64, n_output_dims=1, seed=1337, dtype=torch.float16, hyperparams={'encoding': {'offset': 0.0, 'otype': 'Identity', 'scale': 1.0}, 'network': {'activation': 'ReLU', 'n_hidden_layers': 2, 'n_neurons': 64, 'otype': 'FullyFusedMLP', 'output_activation': 'None'}, 'otype': 'NetworkWithInputEncoding'})
+)
+Training on cuda:0 C:\Users\Sky\Documents\GitHub\AMGSRN\Code\..\SavedModels\1grid_64feats
+Iteration 0/50000, Fitting loss:  0.0460855 
+Iteration 50/50000, Fitting loss:  0.0018643 
+Iteration 100/50000, Fitting loss:  0.0016407 
+Iteration 150/50000, Fitting loss:  0.0015229 
+Iteration 200/50000, Fitting loss:  0.0014538 
+Iteration 250/50000, Fitting loss:  0.0014806 
+Iteration 300/50000, Fitting loss:  0.0014474 
+Iteration 350/50000, Fitting loss:  0.0014183 
+Iteration 400/50000, Fitting loss:  0.0014031 
+Iteration 450/50000, Fitting loss:  0.0013907 
+Iteration 500/50000, Fitting loss:  0.0013468 
+Iteration 550/50000, Fitting loss:  0.0004692 Grid loss:  0.0000363 
+Iteration 600/50000, Fitting loss:  0.0003439 Grid loss:  0.0000374 
+Iteration 650/50000, Fitting loss:  0.0003393 Grid loss:  0.0000381 
+Iteration 700/50000, Fitting loss:  0.0003313 Grid loss:  0.0000378 
+Iteration 750/50000, Fitting loss:  0.0003220 Grid loss:  0.0000380 
+Iteration 800/50000, Fitting loss:  0.0002962 Grid loss:  0.0000383 
+Iteration 850/50000, Fitting loss:  0.0003224 Grid loss:  0.0000381 
+Iteration 900/50000, Fitting loss:  0.0002858 Grid loss:  0.0000380 
+Iteration 950/50000, Fitting loss:  0.0002738 Grid loss:  0.0000379 
+Iteration 1000/50000, Fitting loss:  0.0002627 Grid loss:  0.0000382 
+Iteration 1050/50000, Fitting loss:  0.0002642 Grid loss:  0.0000384 
+Epoch 00561: reducing learning rate of group 0 to 5.0000e-04.
+Epoch 00561: reducing learning rate of group 1 to 5.0000e-04.
+Epoch 00561: reducing learning rate of group 2 to 5.0000e-04.
+Iteration 1100/50000, Fitting loss:  0.0002578 Grid loss:  0.0000386 
+Iteration 1150/50000, Fitting loss:  0.0002625 Grid loss:  0.0000388 
+Iteration 1200/50000, Fitting loss:  0.0002427 Grid loss:  0.0000388 
+Iteration 1250/50000, Fitting loss:  0.0002508 Grid loss:  0.0000388 
+Iteration 1300/50000, Fitting loss:  0.0002427 Grid loss:  0.0000384 
+Iteration 1350/50000, Fitting loss:  0.0002435 Grid loss:  0.0000385 
+Iteration 1400/50000, Fitting loss:  0.0002483 Grid loss:  0.0000383 
+Iteration 1450/50000, Fitting loss:  0.0002675 Grid loss:  0.0000384 
+Iteration 1500/50000, Fitting loss:  0.0002385 Grid loss:  0.0000382 
+Iteration 1550/50000, Fitting loss:  0.0002284 Grid loss:  0.0000385 
+Iteration 1600/50000, Fitting loss:  0.0002212 Grid loss:  0.0000385 
+Iteration 1650/50000, Fitting loss:  0.0002320 Grid loss:  0.0000388 
+Iteration 1700/50000, Fitting loss:  0.0002166 Grid loss:  0.0000393 
+Iteration 1750/50000, Fitting loss:  0.0002074 Grid loss:  0.0000391 
+Iteration 1800/50000, Fitting loss:  0.0001934 Grid loss:  0.0000390 
+Epoch 01312: reducing learning rate of group 0 to 2.5000e-04.
+Epoch 01312: reducing learning rate of group 1 to 2.5000e-04.
+Epoch 01312: reducing learning rate of group 2 to 2.5000e-04.
+Iteration 1850/50000, Fitting loss:  0.0002033 Grid loss:  0.0000388 
+Iteration 1900/50000, Fitting loss:  0.0002080 Grid loss:  0.0000393 
+Iteration 1950/50000, Fitting loss:  0.0002016 Grid loss:  0.0000389 
+Iteration 2000/50000, Fitting loss:  0.0002065 Grid loss:  0.0000387 
+Iteration 2050/50000, Fitting loss:  0.0001899 Grid loss:  0.0000390 
+Iteration 2100/50000, Fitting loss:  0.0001900 Grid loss:  0.0000390 
+Iteration 2150/50000, Fitting loss:  0.0001863 Grid loss:  0.0000393 
+Iteration 2200/50000, Fitting loss:  0.0001961 Grid loss:  0.0000389 
+Iteration 2250/50000, Fitting loss:  0.0001898 Grid loss:  0.0000392 
+Iteration 2300/50000, Fitting loss:  0.0001897 Grid loss:  0.0000391 
+Iteration 2350/50000, Fitting loss:  0.0001866 Grid loss:  0.0000393 
+Iteration 2400/50000, Fitting loss:  0.0001857 Grid loss:  0.0000392 
+Iteration 2450/50000, Fitting loss:  0.0001929 Grid loss:  0.0000394 
+Iteration 2500/50000, Fitting loss:  0.0001953 Grid loss:  0.0000394 
+Iteration 2550/50000, Fitting loss:  0.0001767 Grid loss:  0.0000392 
+Epoch 02063: reducing learning rate of group 0 to 1.2500e-04.
+Epoch 02063: reducing learning rate of group 1 to 1.2500e-04.
+Epoch 02063: reducing learning rate of group 2 to 1.2500e-04.
+Iteration 2600/50000, Fitting loss:  0.0001905 Grid loss:  0.0000397 
+Iteration 2650/50000, Fitting loss:  0.0001940 Grid loss:  0.0000399 
+Iteration 2700/50000, Fitting loss:  0.0001890 Grid loss:  0.0000395 
+Iteration 2750/50000, Fitting loss:  0.0001688 Grid loss:  0.0000397 
+Iteration 2800/50000, Fitting loss:  0.0001925 Grid loss:  0.0000390 
+Iteration 2850/50000, Fitting loss:  0.0001758 Grid loss:  0.0000394 
+Iteration 2900/50000, Fitting loss:  0.0001746 Grid loss:  0.0000394 
+Iteration 2950/50000, Fitting loss:  0.0001614 Grid loss:  0.0000397 
+Iteration 3000/50000, Fitting loss:  0.0001827 Grid loss:  0.0000394 
+Iteration 3050/50000, Fitting loss:  0.0001732 Grid loss:  0.0000393 
+Iteration 3100/50000, Fitting loss:  0.0001746 Grid loss:  0.0000390 
+Iteration 3150/50000, Fitting loss:  0.0001691 Grid loss:  0.0000396 
+Iteration 3200/50000, Fitting loss:  0.0001756 Grid loss:  0.0000397 
+Iteration 3250/50000, Fitting loss:  0.0001644 Grid loss:  0.0000394 
+Iteration 3300/50000, Fitting loss:  0.0001821 Grid loss:  0.0000390 
+Epoch 02814: reducing learning rate of group 0 to 6.2500e-05.
+Epoch 02814: reducing learning rate of group 1 to 6.2500e-05.
+Epoch 02814: reducing learning rate of group 2 to 6.2500e-05.
+Iteration 3350/50000, Fitting loss:  0.0001646 Grid loss:  0.0000399 
+Iteration 3400/50000, Fitting loss:  0.0001676 Grid loss:  0.0000398 
+Iteration 3450/50000, Fitting loss:  0.0001730 Grid loss:  0.0000400 
+Iteration 3500/50000, Fitting loss:  0.0001600 Grid loss:  0.0000394 
+Iteration 3550/50000, Fitting loss:  0.0001639 Grid loss:  0.0000395 
+Iteration 3600/50000, Fitting loss:  0.0001662 Grid loss:  0.0000401 
+Iteration 3650/50000, Fitting loss:  0.0001509 Grid loss:  0.0000393 
+Iteration 3700/50000, Fitting loss:  0.0001557 Grid loss:  0.0000395 
+Iteration 3750/50000, Fitting loss:  0.0001639 Grid loss:  0.0000397 
+Iteration 3800/50000, Fitting loss:  0.0001720 Grid loss:  0.0000400 
+Iteration 3850/50000, Fitting loss:  0.0001651 Grid loss:  0.0000397 
+Iteration 3900/50000, Fitting loss:  0.0001612 Grid loss:  0.0000392 
+Iteration 3950/50000, Fitting loss:  0.0001599 Grid loss:  0.0000397 
+Iteration 4000/50000, Fitting loss:  0.0001758 Grid loss:  0.0000395 
+Iteration 4050/50000, Fitting loss:  0.0001630 Grid loss:  0.0000399 
+Epoch 03565: reducing learning rate of group 0 to 3.1250e-05.
+Epoch 03565: reducing learning rate of group 1 to 3.1250e-05.
+Epoch 03565: reducing learning rate of group 2 to 3.1250e-05.
+Iteration 4100/50000, Fitting loss:  0.0001650 Grid loss:  0.0000396 
+Iteration 4150/50000, Fitting loss:  0.0001588 Grid loss:  0.0000399 
+Iteration 4200/50000, Fitting loss:  0.0001530 Grid loss:  0.0000399 
+Iteration 4250/50000, Fitting loss:  0.0001558 Grid loss:  0.0000397 
+Iteration 4300/50000, Fitting loss:  0.0001630 Grid loss:  0.0000396 
+Iteration 4350/50000, Fitting loss:  0.0001604 Grid loss:  0.0000398 
+Iteration 4400/50000, Fitting loss:  0.0001479 Grid loss:  0.0000401 
+Iteration 4450/50000, Fitting loss:  0.0001700 Grid loss:  0.0000397 
+Iteration 4500/50000, Fitting loss:  0.0001642 Grid loss:  0.0000400 
+Iteration 4550/50000, Fitting loss:  0.0001518 Grid loss:  0.0000402 
+Iteration 4600/50000, Fitting loss:  0.0001491 Grid loss:  0.0000398 
+Iteration 4650/50000, Fitting loss:  0.0001481 Grid loss:  0.0000396 
+Iteration 4700/50000, Fitting loss:  0.0001472 Grid loss:  0.0000398 
+Iteration 4750/50000, Fitting loss:  0.0001615 Grid loss:  0.0000402 
+Iteration 4800/50000, Fitting loss:  0.0001509 Grid loss:  0.0000398 
+Epoch 04316: reducing learning rate of group 0 to 1.5625e-05.
+Epoch 04316: reducing learning rate of group 1 to 1.5625e-05.
+Epoch 04316: reducing learning rate of group 2 to 1.5625e-05.
+Grid has converged. Setting early stopping flag.
+Iteration 4850/50000, Fitting loss:  0.0001491 
+Iteration 4900/50000, Fitting loss:  0.0001446 
+Iteration 4950/50000, Fitting loss:  0.0001505 
+Iteration 5000/50000, Fitting loss:  0.0001534 
+Iteration 5050/50000, Fitting loss:  0.0001402 
+Iteration 5100/50000, Fitting loss:  0.0001579 
+Iteration 5150/50000, Fitting loss:  0.0001382 
+Iteration 5200/50000, Fitting loss:  0.0001413 
+Iteration 5250/50000, Fitting loss:  0.0001328 
+Iteration 5300/50000, Fitting loss:  0.0001426 
+Iteration 5350/50000, Fitting loss:  0.0001513 
+Iteration 5400/50000, Fitting loss:  0.0001613 
+Iteration 5450/50000, Fitting loss:  0.0001417 
+Iteration 5500/50000, Fitting loss:  0.0001409 
+Iteration 5550/50000, Fitting loss:  0.0001598 
+Iteration 5600/50000, Fitting loss:  0.0001411 
+Iteration 5650/50000, Fitting loss:  0.0001472 
+Iteration 5700/50000, Fitting loss:  0.0001533 
+Iteration 5750/50000, Fitting loss:  0.0001602 
+Iteration 5800/50000, Fitting loss:  0.0001443 
+Iteration 5850/50000, Fitting loss:  0.0001437 
+Iteration 5900/50000, Fitting loss:  0.0001480 
+Iteration 5950/50000, Fitting loss:  0.0001369 
+Iteration 6000/50000, Fitting loss:  0.0001464 
+Iteration 6050/50000, Fitting loss:  0.0001383 
+Iteration 6100/50000, Fitting loss:  0.0001314 
+Iteration 6150/50000, Fitting loss:  0.0001449 
+Iteration 6200/50000, Fitting loss:  0.0001433 
+Iteration 6250/50000, Fitting loss:  0.0001485 
+Iteration 6300/50000, Fitting loss:  0.0001510 
+Iteration 6350/50000, Fitting loss:  0.0001373 
+Iteration 6400/50000, Fitting loss:  0.0001454 
+Iteration 6450/50000, Fitting loss:  0.0001316 
+Iteration 6500/50000, Fitting loss:  0.0001411 
+Iteration 6550/50000, Fitting loss:  0.0001351 
+Iteration 6600/50000, Fitting loss:  0.0001496 
+Iteration 6650/50000, Fitting loss:  0.0001368 
+Iteration 6700/50000, Fitting loss:  0.0001473 
+Iteration 6750/50000, Fitting loss:  0.0001409 
+Iteration 6800/50000, Fitting loss:  0.0001446 
+Iteration 6850/50000, Fitting loss:  0.0001467 
+Iteration 6900/50000, Fitting loss:  0.0001495 
+Iteration 6950/50000, Fitting loss:  0.0001326 
+Iteration 7000/50000, Fitting loss:  0.0001348 
+Iteration 7050/50000, Fitting loss:  0.0001452 
+Iteration 7100/50000, Fitting loss:  0.0001343 
+Iteration 7150/50000, Fitting loss:  0.0001388 
+Iteration 7200/50000, Fitting loss:  0.0001401 
+Iteration 7250/50000, Fitting loss:  0.0001374 
+Iteration 7300/50000, Fitting loss:  0.0001446 
+Iteration 7350/50000, Fitting loss:  0.0001412 
+Iteration 7400/50000, Fitting loss:  0.0001408 
+Iteration 7450/50000, Fitting loss:  0.0001266 
+Iteration 7500/50000, Fitting loss:  0.0001296 
+Iteration 7550/50000, Fitting loss:  0.0001285 
+Iteration 7600/50000, Fitting loss:  0.0001363 
+Iteration 7650/50000, Fitting loss:  0.0001399 
+Iteration 7700/50000, Fitting loss:  0.0001872 
+Iteration 7750/50000, Fitting loss:  0.0001383 
+Iteration 7800/50000, Fitting loss:  0.0001294 
+Iteration 7850/50000, Fitting loss:  0.0001268 
+Iteration 7900/50000, Fitting loss:  0.0001386 
+Iteration 7950/50000, Fitting loss:  0.0001410 
+Iteration 8000/50000, Fitting loss:  0.0001331 
+Iteration 8050/50000, Fitting loss:  0.0001400 
+Iteration 8100/50000, Fitting loss:  0.0001273 
+Iteration 8150/50000, Fitting loss:  0.0001356 
+Iteration 8200/50000, Fitting loss:  0.0001274 
+Iteration 8250/50000, Fitting loss:  0.0001270 
+Iteration 8300/50000, Fitting loss:  0.0001387 
+Iteration 8350/50000, Fitting loss:  0.0001510 
+Iteration 8400/50000, Fitting loss:  0.0001346 
+Iteration 8450/50000, Fitting loss:  0.0001342 
+Iteration 8500/50000, Fitting loss:  0.0001269 
+Iteration 8550/50000, Fitting loss:  0.0001268 
+Iteration 8600/50000, Fitting loss:  0.0001444 
+Iteration 8650/50000, Fitting loss:  0.0001217 
+Iteration 8700/50000, Fitting loss:  0.0001435 
+Iteration 8750/50000, Fitting loss:  0.0001297 
+Iteration 8800/50000, Fitting loss:  0.0001289 
+Iteration 8850/50000, Fitting loss:  0.0001386 
+Iteration 8900/50000, Fitting loss:  0.0001350 
+Iteration 8950/50000, Fitting loss:  0.0001403 
+Iteration 9000/50000, Fitting loss:  0.0001277 
+Iteration 9050/50000, Fitting loss:  0.0001310 
+Iteration 9100/50000, Fitting loss:  0.0001328 
+Iteration 9150/50000, Fitting loss:  0.0001254 
+Iteration 9200/50000, Fitting loss:  0.0001258 
+Iteration 9250/50000, Fitting loss:  0.0001339 
+Iteration 9300/50000, Fitting loss:  0.0001344 
+Iteration 9350/50000, Fitting loss:  0.0001336 
+Iteration 9400/50000, Fitting loss:  0.0001298 
+Iteration 9450/50000, Fitting loss:  0.0001278 
+Iteration 9500/50000, Fitting loss:  0.0001290 
+Iteration 9550/50000, Fitting loss:  0.0001252 
+Iteration 9600/50000, Fitting loss:  0.0001402 
+Iteration 9650/50000, Fitting loss:  0.0001254 
+Iteration 9700/50000, Fitting loss:  0.0001277 
+Iteration 9750/50000, Fitting loss:  0.0001273 
+Iteration 9800/50000, Fitting loss:  0.0001191 
+Iteration 9850/50000, Fitting loss:  0.0001300 
+Iteration 9900/50000, Fitting loss:  0.0001219 
+Iteration 9950/50000, Fitting loss:  0.0001309 
+Iteration 10000/50000, Fitting loss:  0.0001300 
+Iteration 10050/50000, Fitting loss:  0.0001180 
+Iteration 10100/50000, Fitting loss:  0.0001315 
+Iteration 10150/50000, Fitting loss:  0.0001229 
+Iteration 10200/50000, Fitting loss:  0.0001173 
+Iteration 10250/50000, Fitting loss:  0.0001337 
+Iteration 10300/50000, Fitting loss:  0.0001363 
+Iteration 10350/50000, Fitting loss:  0.0001333 
+Iteration 10400/50000, Fitting loss:  0.0001314 
+Iteration 10450/50000, Fitting loss:  0.0001239 
+Iteration 10500/50000, Fitting loss:  0.0001217 
+Iteration 10550/50000, Fitting loss:  0.0001218 
+Iteration 10600/50000, Fitting loss:  0.0001411 
+Iteration 10650/50000, Fitting loss:  0.0001348 
+Iteration 10700/50000, Fitting loss:  0.0001180 
+Iteration 10750/50000, Fitting loss:  0.0001262 
+Iteration 10800/50000, Fitting loss:  0.0001271 
+Iteration 10850/50000, Fitting loss:  0.0001268 
+Iteration 10900/50000, Fitting loss:  0.0001238 
+Iteration 10950/50000, Fitting loss:  0.0001185 
+Iteration 11000/50000, Fitting loss:  0.0001415 
+Iteration 11050/50000, Fitting loss:  0.0001314 
+Iteration 11100/50000, Fitting loss:  0.0001246 
+Iteration 11150/50000, Fitting loss:  0.0001231 
+Iteration 11200/50000, Fitting loss:  0.0001266 
+Iteration 11250/50000, Fitting loss:  0.0001270 
+Iteration 11300/50000, Fitting loss:  0.0001136 
+Iteration 11350/50000, Fitting loss:  0.0001210 
+Iteration 11400/50000, Fitting loss:  0.0001303 
+Iteration 11450/50000, Fitting loss:  0.0001230 
+Iteration 11500/50000, Fitting loss:  0.0001228 
+Iteration 11550/50000, Fitting loss:  0.0001344 
+Iteration 11600/50000, Fitting loss:  0.0001240 
+Iteration 11650/50000, Fitting loss:  0.0001263 
+Iteration 11700/50000, Fitting loss:  0.0001267 
+Iteration 11750/50000, Fitting loss:  0.0001245 
+Iteration 11800/50000, Fitting loss:  0.0001203 
+Iteration 11850/50000, Fitting loss:  0.0001244 
+Iteration 11900/50000, Fitting loss:  0.0001360 
+Iteration 11950/50000, Fitting loss:  0.0001324 
+Iteration 12000/50000, Fitting loss:  0.0001285 
+Iteration 12050/50000, Fitting loss:  0.0001157 
+Iteration 12100/50000, Fitting loss:  0.0001259 
+Iteration 12150/50000, Fitting loss:  0.0001197 
+Iteration 12200/50000, Fitting loss:  0.0001295 
+Iteration 12250/50000, Fitting loss:  0.0001332 
+Iteration 12300/50000, Fitting loss:  0.0001214 
+Iteration 12350/50000, Fitting loss:  0.0001342 
+Iteration 12400/50000, Fitting loss:  0.0001182 
+Iteration 12450/50000, Fitting loss:  0.0001156 
+Iteration 12500/50000, Fitting loss:  0.0001228 
+Iteration 12550/50000, Fitting loss:  0.0001279 
+Iteration 12600/50000, Fitting loss:  0.0001255 
+Iteration 12650/50000, Fitting loss:  0.0001302 
+Iteration 12700/50000, Fitting loss:  0.0001281 
+Iteration 12750/50000, Fitting loss:  0.0001318 
+Iteration 12800/50000, Fitting loss:  0.0001213 
+Iteration 12850/50000, Fitting loss:  0.0001255 
+Iteration 12900/50000, Fitting loss:  0.0001178 
+Iteration 12950/50000, Fitting loss:  0.0001178 
+Iteration 13000/50000, Fitting loss:  0.0001188 
+Iteration 13050/50000, Fitting loss:  0.0001265 
+Iteration 13100/50000, Fitting loss:  0.0001229 
+Iteration 13150/50000, Fitting loss:  0.0001184 
+Iteration 13200/50000, Fitting loss:  0.0001226 
+Iteration 13250/50000, Fitting loss:  0.0001315 
+Iteration 13300/50000, Fitting loss:  0.0001223 
+Iteration 13350/50000, Fitting loss:  0.0001253 
+Iteration 13400/50000, Fitting loss:  0.0001227 
+Iteration 13450/50000, Fitting loss:  0.0001220 
+Iteration 13500/50000, Fitting loss:  0.0001174 
+Iteration 13550/50000, Fitting loss:  0.0001210 
+Iteration 13600/50000, Fitting loss:  0.0001233 
+Iteration 13650/50000, Fitting loss:  0.0001256 
+Iteration 13700/50000, Fitting loss:  0.0001307 
+Iteration 13750/50000, Fitting loss:  0.0001136 
+Iteration 13800/50000, Fitting loss:  0.0001115 
+Iteration 13850/50000, Fitting loss:  0.0001371 
+Iteration 13900/50000, Fitting loss:  0.0001280 
+Iteration 13950/50000, Fitting loss:  0.0001237 
+Iteration 14000/50000, Fitting loss:  0.0001122 
+Iteration 14050/50000, Fitting loss:  0.0001342 
+Iteration 14100/50000, Fitting loss:  0.0001185 
+Iteration 14150/50000, Fitting loss:  0.0001186 
+Iteration 14200/50000, Fitting loss:  0.0001266 
+Iteration 14250/50000, Fitting loss:  0.0001162 
+Iteration 14300/50000, Fitting loss:  0.0001181 
+Iteration 14350/50000, Fitting loss:  0.0001271 
+Iteration 14400/50000, Fitting loss:  0.0001248 
+Iteration 14450/50000, Fitting loss:  0.0001265 
+Iteration 14500/50000, Fitting loss:  0.0001223 
+Iteration 14550/50000, Fitting loss:  0.0001229 
+Iteration 14600/50000, Fitting loss:  0.0001169 
+Iteration 14650/50000, Fitting loss:  0.0001084 
+Iteration 14700/50000, Fitting loss:  0.0001198 
+Iteration 14750/50000, Fitting loss:  0.0001223 
+Iteration 14800/50000, Fitting loss:  0.0001239 
+Iteration 14850/50000, Fitting loss:  0.0001276 
+Iteration 14900/50000, Fitting loss:  0.0001214 
+Iteration 14950/50000, Fitting loss:  0.0001274 
+Iteration 15000/50000, Fitting loss:  0.0001237 
+Iteration 15050/50000, Fitting loss:  0.0001182 
+Iteration 15100/50000, Fitting loss:  0.0001263 
+Iteration 15150/50000, Fitting loss:  0.0001131 
+Iteration 15200/50000, Fitting loss:  0.0001664 
+Iteration 15250/50000, Fitting loss:  0.0001249 
+Iteration 15300/50000, Fitting loss:  0.0001118 
+Iteration 15350/50000, Fitting loss:  0.0001216 
+Iteration 15400/50000, Fitting loss:  0.0001150 
+Iteration 15450/50000, Fitting loss:  0.0001227 
+Iteration 15500/50000, Fitting loss:  0.0001196 
+Iteration 15550/50000, Fitting loss:  0.0001260 
+Iteration 15600/50000, Fitting loss:  0.0001239 
+Iteration 15650/50000, Fitting loss:  0.0001310 
+Iteration 15700/50000, Fitting loss:  0.0001278 
+Iteration 15750/50000, Fitting loss:  0.0001311 
+Iteration 15800/50000, Fitting loss:  0.0001222 
+Iteration 15850/50000, Fitting loss:  0.0001167 
+Iteration 15900/50000, Fitting loss:  0.0001140 
+Iteration 15950/50000, Fitting loss:  0.0001235 
+Iteration 16000/50000, Fitting loss:  0.0001164 
+Iteration 16050/50000, Fitting loss:  0.0001280 
+Iteration 16100/50000, Fitting loss:  0.0001156 
+Iteration 16150/50000, Fitting loss:  0.0001206 
+Iteration 16200/50000, Fitting loss:  0.0001274 
+Iteration 16250/50000, Fitting loss:  0.0001169 
+Iteration 16300/50000, Fitting loss:  0.0001185 
+Iteration 16350/50000, Fitting loss:  0.0001175 
+Iteration 16400/50000, Fitting loss:  0.0001242 
+Iteration 16450/50000, Fitting loss:  0.0001227 
+Iteration 16500/50000, Fitting loss:  0.0001301 
+Iteration 16550/50000, Fitting loss:  0.0001245 
+Iteration 16600/50000, Fitting loss:  0.0001284 
+Iteration 16650/50000, Fitting loss:  0.0001171 
+Iteration 16700/50000, Fitting loss:  0.0001118 
+Iteration 16750/50000, Fitting loss:  0.0001163 
+Iteration 16800/50000, Fitting loss:  0.0001164 
+Iteration 16850/50000, Fitting loss:  0.0001116 
+Iteration 16900/50000, Fitting loss:  0.0001317 
+Iteration 16950/50000, Fitting loss:  0.0001166 
+Iteration 17000/50000, Fitting loss:  0.0001215 
+Iteration 17050/50000, Fitting loss:  0.0001193 
+Iteration 17100/50000, Fitting loss:  0.0001174 
+Iteration 17150/50000, Fitting loss:  0.0001142 
+Iteration 17200/50000, Fitting loss:  0.0001368 
+Iteration 17250/50000, Fitting loss:  0.0001262 
+Iteration 17300/50000, Fitting loss:  0.0001214 
+Iteration 17350/50000, Fitting loss:  0.0001174 
+Iteration 17400/50000, Fitting loss:  0.0001087 
+Iteration 17450/50000, Fitting loss:  0.0001197 
+Iteration 17500/50000, Fitting loss:  0.0001284 
+Iteration 17550/50000, Fitting loss:  0.0001101 
+Iteration 17600/50000, Fitting loss:  0.0001239 
+Iteration 17650/50000, Fitting loss:  0.0001246 
+Iteration 17700/50000, Fitting loss:  0.0001194 
+Iteration 17750/50000, Fitting loss:  0.0001093 
+Iteration 17800/50000, Fitting loss:  0.0001090 
+Iteration 17850/50000, Fitting loss:  0.0001088 
+Iteration 17900/50000, Fitting loss:  0.0001256 
+Iteration 17950/50000, Fitting loss:  0.0001132 
+Iteration 18000/50000, Fitting loss:  0.0001134 
+Iteration 18050/50000, Fitting loss:  0.0001226 
+Iteration 18100/50000, Fitting loss:  0.0001136 
+Iteration 18150/50000, Fitting loss:  0.0001269 
+Iteration 18200/50000, Fitting loss:  0.0001076 
+Iteration 18250/50000, Fitting loss:  0.0001255 
+Iteration 18300/50000, Fitting loss:  0.0001353 
+Iteration 18350/50000, Fitting loss:  0.0001189 
+Iteration 18400/50000, Fitting loss:  0.0001156 
+Iteration 18450/50000, Fitting loss:  0.0001263 
+Iteration 18500/50000, Fitting loss:  0.0001146 
+Iteration 18550/50000, Fitting loss:  0.0001187 
+Iteration 18600/50000, Fitting loss:  0.0001170 
+Iteration 18650/50000, Fitting loss:  0.0001147 
+Iteration 18700/50000, Fitting loss:  0.0001217 
+Iteration 18750/50000, Fitting loss:  0.0001194 
+Iteration 18800/50000, Fitting loss:  0.0001143 
+Iteration 18850/50000, Fitting loss:  0.0001148 
+Iteration 18900/50000, Fitting loss:  0.0001189 
+Iteration 18950/50000, Fitting loss:  0.0001208 
+Iteration 19000/50000, Fitting loss:  0.0001237 
+Iteration 19050/50000, Fitting loss:  0.0001142 
+Iteration 19100/50000, Fitting loss:  0.0001112 
+Iteration 19150/50000, Fitting loss:  0.0001127 
+Iteration 19200/50000, Fitting loss:  0.0001199 
+Iteration 19250/50000, Fitting loss:  0.0001082 
+Iteration 19300/50000, Fitting loss:  0.0001274 
+Iteration 19350/50000, Fitting loss:  0.0001071 
+Iteration 19400/50000, Fitting loss:  0.0001109 
+Iteration 19450/50000, Fitting loss:  0.0001276 
+Iteration 19500/50000, Fitting loss:  0.0001121 
+Iteration 19550/50000, Fitting loss:  0.0001129 
+Iteration 19600/50000, Fitting loss:  0.0001107 
+Iteration 19650/50000, Fitting loss:  0.0001225 
+Iteration 19700/50000, Fitting loss:  0.0001081 
+Iteration 19750/50000, Fitting loss:  0.0001196 
+Iteration 19800/50000, Fitting loss:  0.0001152 
+Iteration 19850/50000, Fitting loss:  0.0001180 
+Iteration 19900/50000, Fitting loss:  0.0001076 
+Iteration 19950/50000, Fitting loss:  0.0001220 
+Iteration 20000/50000, Fitting loss:  0.0001184 
+Iteration 20050/50000, Fitting loss:  0.0001205 
+Iteration 20100/50000, Fitting loss:  0.0001129 
+Iteration 20150/50000, Fitting loss:  0.0001153 
+Iteration 20200/50000, Fitting loss:  0.0001130 
+Iteration 20250/50000, Fitting loss:  0.0001200 
+Iteration 20300/50000, Fitting loss:  0.0001151 
+Iteration 20350/50000, Fitting loss:  0.0001194 
+Iteration 20400/50000, Fitting loss:  0.0001216 
+Iteration 20450/50000, Fitting loss:  0.0001119 
+Iteration 20500/50000, Fitting loss:  0.0001129 
+Iteration 20550/50000, Fitting loss:  0.0001133 
+Iteration 20600/50000, Fitting loss:  0.0001208 
+Iteration 20650/50000, Fitting loss:  0.0001257 
+Iteration 20700/50000, Fitting loss:  0.0001109 
+Iteration 20750/50000, Fitting loss:  0.0001160 
+Iteration 20800/50000, Fitting loss:  0.0001135 
+Iteration 20850/50000, Fitting loss:  0.0001162 
+Iteration 20900/50000, Fitting loss:  0.0001374 
+Iteration 20950/50000, Fitting loss:  0.0001186 
+Iteration 21000/50000, Fitting loss:  0.0001225 
+Iteration 21050/50000, Fitting loss:  0.0001120 
+Iteration 21100/50000, Fitting loss:  0.0001028 
+Iteration 21150/50000, Fitting loss:  0.0001183 
+Iteration 21200/50000, Fitting loss:  0.0001079 
+Iteration 21250/50000, Fitting loss:  0.0001215 
+Iteration 21300/50000, Fitting loss:  0.0001060 
+Iteration 21350/50000, Fitting loss:  0.0001103 
+Iteration 21400/50000, Fitting loss:  0.0001205 
+Iteration 21450/50000, Fitting loss:  0.0001097 
+Iteration 21500/50000, Fitting loss:  0.0001186 
+Iteration 21550/50000, Fitting loss:  0.0001134 
+Iteration 21600/50000, Fitting loss:  0.0001129 
+Iteration 21650/50000, Fitting loss:  0.0001195 
+Iteration 21700/50000, Fitting loss:  0.0001096 
+Iteration 21750/50000, Fitting loss:  0.0001152 
+Iteration 21800/50000, Fitting loss:  0.0001138 
+Iteration 21850/50000, Fitting loss:  0.0001096 
+Iteration 21900/50000, Fitting loss:  0.0001116 
+Iteration 21950/50000, Fitting loss:  0.0001110 
+Iteration 22000/50000, Fitting loss:  0.0001199 
+Iteration 22050/50000, Fitting loss:  0.0001195 
+Iteration 22100/50000, Fitting loss:  0.0001124 
+Iteration 22150/50000, Fitting loss:  0.0001054 
+Iteration 22200/50000, Fitting loss:  0.0001135 
+Iteration 22250/50000, Fitting loss:  0.0001146 
+Iteration 22300/50000, Fitting loss:  0.0001169 
+Iteration 22350/50000, Fitting loss:  0.0001244 
+Iteration 22400/50000, Fitting loss:  0.0001245 
+Iteration 22450/50000, Fitting loss:  0.0001053 
+Iteration 22500/50000, Fitting loss:  0.0001103 
+Iteration 22550/50000, Fitting loss:  0.0001135 
+Iteration 22600/50000, Fitting loss:  0.0001258 
+Iteration 22650/50000, Fitting loss:  0.0000994 
+Iteration 22700/50000, Fitting loss:  0.0001203 
+Iteration 22750/50000, Fitting loss:  0.0001184 
+Iteration 22800/50000, Fitting loss:  0.0001207 
+Iteration 22850/50000, Fitting loss:  0.0001143 
+Iteration 22900/50000, Fitting loss:  0.0001111 
+Iteration 22950/50000, Fitting loss:  0.0001189 
+Iteration 23000/50000, Fitting loss:  0.0001092 
+Iteration 23050/50000, Fitting loss:  0.0001084 
+Iteration 23100/50000, Fitting loss:  0.0001042 
+Iteration 23150/50000, Fitting loss:  0.0001214 
+Iteration 23200/50000, Fitting loss:  0.0001210 
+Iteration 23250/50000, Fitting loss:  0.0001115 
+Iteration 23300/50000, Fitting loss:  0.0001139 
+Iteration 23350/50000, Fitting loss:  0.0001138 
+Iteration 23400/50000, Fitting loss:  0.0001143 
+Iteration 23450/50000, Fitting loss:  0.0001223 
+Iteration 23500/50000, Fitting loss:  0.0001124 
+Iteration 23550/50000, Fitting loss:  0.0001101 
+Iteration 23600/50000, Fitting loss:  0.0001182 
+Iteration 23650/50000, Fitting loss:  0.0001198 
+Iteration 23700/50000, Fitting loss:  0.0001133 
+Iteration 23750/50000, Fitting loss:  0.0001024 
+Iteration 23800/50000, Fitting loss:  0.0001162 
+Iteration 23850/50000, Fitting loss:  0.0001224 
+Iteration 23900/50000, Fitting loss:  0.0001130 
+Iteration 23950/50000, Fitting loss:  0.0001102 
+Iteration 24000/50000, Fitting loss:  0.0001117 
+Iteration 24050/50000, Fitting loss:  0.0001227 
+Iteration 24100/50000, Fitting loss:  0.0001128 
+Iteration 24150/50000, Fitting loss:  0.0001111 
+Iteration 24200/50000, Fitting loss:  0.0001125 
+Iteration 24250/50000, Fitting loss:  0.0001051 
+Iteration 24300/50000, Fitting loss:  0.0001148 
+Iteration 24350/50000, Fitting loss:  0.0001104 
+Iteration 24400/50000, Fitting loss:  0.0001251 
+Iteration 24450/50000, Fitting loss:  0.0001083 
+Iteration 24500/50000, Fitting loss:  0.0001114 
+Iteration 24550/50000, Fitting loss:  0.0001155 
+Iteration 24600/50000, Fitting loss:  0.0001174 
+Iteration 24650/50000, Fitting loss:  0.0001050 
+Iteration 24700/50000, Fitting loss:  0.0000993 
+Iteration 24750/50000, Fitting loss:  0.0001053 
+Iteration 24800/50000, Fitting loss:  0.0001183 
+Iteration 24850/50000, Fitting loss:  0.0001286 
+Iteration 24900/50000, Fitting loss:  0.0001108 
+Iteration 24950/50000, Fitting loss:  0.0001145 
+Iteration 25000/50000, Fitting loss:  0.0001134 
+Iteration 25050/50000, Fitting loss:  0.0001189 
+Iteration 25100/50000, Fitting loss:  0.0001121 
+Iteration 25150/50000, Fitting loss:  0.0001071 
+Iteration 25200/50000, Fitting loss:  0.0001132 
+Iteration 25250/50000, Fitting loss:  0.0001185 
+Epoch 20436: reducing learning rate of group 0 to 1.0000e-03.
+Epoch 20436: reducing learning rate of group 1 to 1.0000e-03.
+Iteration 25300/50000, Fitting loss:  0.0001028 
+Iteration 25350/50000, Fitting loss:  0.0000990 
+Iteration 25400/50000, Fitting loss:  0.0001016 
+Iteration 25450/50000, Fitting loss:  0.0000898 
+Iteration 25500/50000, Fitting loss:  0.0000946 
+Iteration 25550/50000, Fitting loss:  0.0000910 
+Iteration 25600/50000, Fitting loss:  0.0000942 
+Iteration 25650/50000, Fitting loss:  0.0000962 
+Iteration 25700/50000, Fitting loss:  0.0000941 
+Iteration 25750/50000, Fitting loss:  0.0000990 
+Iteration 25800/50000, Fitting loss:  0.0000919 
+Iteration 25850/50000, Fitting loss:  0.0000957 
+Iteration 25900/50000, Fitting loss:  0.0000812 
+Iteration 25950/50000, Fitting loss:  0.0000899 
+Iteration 26000/50000, Fitting loss:  0.0000946 
+Iteration 26050/50000, Fitting loss:  0.0000840 
+Iteration 26100/50000, Fitting loss:  0.0000921 
+Iteration 26150/50000, Fitting loss:  0.0000890 
+Iteration 26200/50000, Fitting loss:  0.0000864 
+Iteration 26250/50000, Fitting loss:  0.0000890 
+Iteration 26300/50000, Fitting loss:  0.0000972 
+Iteration 26350/50000, Fitting loss:  0.0000928 
+Iteration 26400/50000, Fitting loss:  0.0000908 
+Iteration 26450/50000, Fitting loss:  0.0000923 
+Iteration 26500/50000, Fitting loss:  0.0000948 
+Iteration 26550/50000, Fitting loss:  0.0000955 
+Iteration 26600/50000, Fitting loss:  0.0000862 
+Iteration 26650/50000, Fitting loss:  0.0000855 
+Iteration 26700/50000, Fitting loss:  0.0000894 
+Iteration 26750/50000, Fitting loss:  0.0000922 
+Iteration 26800/50000, Fitting loss:  0.0000949 
+Iteration 26850/50000, Fitting loss:  0.0000956 
+Iteration 26900/50000, Fitting loss:  0.0000941 
+Iteration 26950/50000, Fitting loss:  0.0000951 
+Iteration 27000/50000, Fitting loss:  0.0000945 
+Iteration 27050/50000, Fitting loss:  0.0000867 
+Iteration 27100/50000, Fitting loss:  0.0000909 
+Iteration 27150/50000, Fitting loss:  0.0000837 
+Iteration 27200/50000, Fitting loss:  0.0000857 
+Iteration 27250/50000, Fitting loss:  0.0000837 
+Iteration 27300/50000, Fitting loss:  0.0000860 
+Iteration 27350/50000, Fitting loss:  0.0000869 
+Iteration 27400/50000, Fitting loss:  0.0000859 
+Iteration 27450/50000, Fitting loss:  0.0000875 
+Iteration 27500/50000, Fitting loss:  0.0000885 
+Iteration 27550/50000, Fitting loss:  0.0000913 
+Iteration 27600/50000, Fitting loss:  0.0000953 
+Iteration 27650/50000, Fitting loss:  0.0000981 
+Iteration 27700/50000, Fitting loss:  0.0000874 
+Iteration 27750/50000, Fitting loss:  0.0000906 
+Iteration 27800/50000, Fitting loss:  0.0000974 
+Iteration 27850/50000, Fitting loss:  0.0000913 
+Iteration 27900/50000, Fitting loss:  0.0000858 
+Iteration 27950/50000, Fitting loss:  0.0000884 
+Iteration 28000/50000, Fitting loss:  0.0000896 
+Iteration 28050/50000, Fitting loss:  0.0000933 
+Iteration 28100/50000, Fitting loss:  0.0000891 
+Iteration 28150/50000, Fitting loss:  0.0000883 
+Iteration 28200/50000, Fitting loss:  0.0000853 
+Iteration 28250/50000, Fitting loss:  0.0000879 
+Iteration 28300/50000, Fitting loss:  0.0000875 
+Iteration 28350/50000, Fitting loss:  0.0000844 
+Iteration 28400/50000, Fitting loss:  0.0000913 
+Iteration 28450/50000, Fitting loss:  0.0000881 
+Iteration 28500/50000, Fitting loss:  0.0000866 
+Iteration 28550/50000, Fitting loss:  0.0000887 
+Iteration 28600/50000, Fitting loss:  0.0000893 
+Iteration 28650/50000, Fitting loss:  0.0000929 
+Iteration 28700/50000, Fitting loss:  0.0000837 
+Iteration 28750/50000, Fitting loss:  0.0000958 
+Iteration 28800/50000, Fitting loss:  0.0000970 
+Iteration 28850/50000, Fitting loss:  0.0000910 
+Iteration 28900/50000, Fitting loss:  0.0000815 
+Iteration 28950/50000, Fitting loss:  0.0000931 
+Iteration 29000/50000, Fitting loss:  0.0000942 
+Iteration 29050/50000, Fitting loss:  0.0000829 
+Iteration 29100/50000, Fitting loss:  0.0000855 
+Iteration 29150/50000, Fitting loss:  0.0000853 
+Iteration 29200/50000, Fitting loss:  0.0000909 
+Iteration 29250/50000, Fitting loss:  0.0000889 
+Iteration 29300/50000, Fitting loss:  0.0000977 
+Iteration 29350/50000, Fitting loss:  0.0000933 
+Iteration 29400/50000, Fitting loss:  0.0000897 
+Epoch 24630: reducing learning rate of group 0 to 1.0000e-04.
+Epoch 24630: reducing learning rate of group 1 to 1.0000e-04.
+Iteration 29450/50000, Fitting loss:  0.0000927 
+Iteration 29500/50000, Fitting loss:  0.0000899 
+Iteration 29550/50000, Fitting loss:  0.0000852 
+Iteration 29600/50000, Fitting loss:  0.0000926 
+Iteration 29650/50000, Fitting loss:  0.0000887 
+Iteration 29700/50000, Fitting loss:  0.0000845 
+Iteration 29750/50000, Fitting loss:  0.0000895 
+Iteration 29800/50000, Fitting loss:  0.0000912 
+Iteration 29850/50000, Fitting loss:  0.0000906 
+Iteration 29900/50000, Fitting loss:  0.0000879 
+Iteration 29950/50000, Fitting loss:  0.0000970 
+Iteration 30000/50000, Fitting loss:  0.0000918 
+Iteration 30050/50000, Fitting loss:  0.0000925 
+Iteration 30100/50000, Fitting loss:  0.0000902 
+Iteration 30150/50000, Fitting loss:  0.0000892 
+Iteration 30200/50000, Fitting loss:  0.0000931 
+Iteration 30250/50000, Fitting loss:  0.0000916 
+Iteration 30300/50000, Fitting loss:  0.0000831 
+Iteration 30350/50000, Fitting loss:  0.0000917 
+Iteration 30400/50000, Fitting loss:  0.0000914 
+Iteration 30450/50000, Fitting loss:  0.0000943 
+Iteration 30500/50000, Fitting loss:  0.0000958 
+Iteration 30550/50000, Fitting loss:  0.0000798 
+Iteration 30600/50000, Fitting loss:  0.0000893 
+Iteration 30650/50000, Fitting loss:  0.0000875 
+Iteration 30700/50000, Fitting loss:  0.0000872 
+Iteration 30750/50000, Fitting loss:  0.0000886 
+Iteration 30800/50000, Fitting loss:  0.0000888 
+Iteration 30850/50000, Fitting loss:  0.0000944 
+Iteration 30900/50000, Fitting loss:  0.0000904 
+Iteration 30950/50000, Fitting loss:  0.0000827 
+Iteration 31000/50000, Fitting loss:  0.0000845 
+Iteration 31050/50000, Fitting loss:  0.0000818 
+Iteration 31100/50000, Fitting loss:  0.0000940 
+Iteration 31150/50000, Fitting loss:  0.0000844 
+Iteration 31200/50000, Fitting loss:  0.0000849 
+Iteration 31250/50000, Fitting loss:  0.0000876 
+Iteration 31300/50000, Fitting loss:  0.0000949 
+Iteration 31350/50000, Fitting loss:  0.0000840 
+Iteration 31400/50000, Fitting loss:  0.0000851 
+Iteration 31450/50000, Fitting loss:  0.0000839 
+Iteration 31500/50000, Fitting loss:  0.0000955 
+Iteration 31550/50000, Fitting loss:  0.0000856 
+Iteration 31600/50000, Fitting loss:  0.0000921 
+Iteration 31650/50000, Fitting loss:  0.0000838 
+Iteration 31700/50000, Fitting loss:  0.0000896 
+Iteration 31750/50000, Fitting loss:  0.0000856 
+Iteration 31800/50000, Fitting loss:  0.0000807 
+Iteration 31850/50000, Fitting loss:  0.0000798 
+Iteration 31900/50000, Fitting loss:  0.0000932 
+Iteration 31950/50000, Fitting loss:  0.0000987 
+Iteration 32000/50000, Fitting loss:  0.0000876 
+Iteration 32050/50000, Fitting loss:  0.0000939 
+Iteration 32100/50000, Fitting loss:  0.0000838 
+Iteration 32150/50000, Fitting loss:  0.0000866 
+Iteration 32200/50000, Fitting loss:  0.0000873 
+Iteration 32250/50000, Fitting loss:  0.0000937 
+Iteration 32300/50000, Fitting loss:  0.0000907 
+Iteration 32350/50000, Fitting loss:  0.0000896 
+Iteration 32400/50000, Fitting loss:  0.0000918 
+Iteration 32450/50000, Fitting loss:  0.0000989 
+Iteration 32500/50000, Fitting loss:  0.0000844 
+Iteration 32550/50000, Fitting loss:  0.0000830 
+Iteration 32600/50000, Fitting loss:  0.0000932 
+Iteration 32650/50000, Fitting loss:  0.0000871 
+Iteration 32700/50000, Fitting loss:  0.0000873 
+Iteration 32750/50000, Fitting loss:  0.0000877 
+Iteration 32800/50000, Fitting loss:  0.0000914 
+Iteration 32850/50000, Fitting loss:  0.0000973 
+Iteration 32900/50000, Fitting loss:  0.0000877 
+Epoch 28129: reducing learning rate of group 0 to 1.0000e-05.
+Epoch 28129: reducing learning rate of group 1 to 1.0000e-05.
+Model completed training after 1m 51.86s

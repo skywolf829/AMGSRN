@@ -1,0 +1,70 @@
+Model was trained with TCNN and TCNN is available.
+APMGSRN(
+  (encoder): APMG_encoder()
+  (decoder): Network(n_input_dims=64, n_output_dims=1, seed=1337, dtype=torch.float16, hyperparams={'encoding': {'offset': 0.0, 'otype': 'Identity', 'scale': 1.0}, 'network': {'activation': 'ReLU', 'n_hidden_layers': 2, 'n_neurons': 64, 'otype': 'FullyFusedMLP', 'output_activation': 'None'}, 'otype': 'NetworkWithInputEncoding'})
+)
+Extents: 0,768,0,768,0,768
+Data: torch.Size([1, 1, 768, 768, 768]) from full extents (1000, 1000, 1000). IO time loading data:  1.6273
+Chunk 0,768,0,768,0,768 SSE: 20782.505859375
+Extents: 0,768,0,768,768,1000
+Data: torch.Size([1, 1, 768, 768, 232]) from full extents (1000, 1000, 1000). IO time loading data:  0.5791
+Chunk 0,768,0,768,768,1000 SSE: 393.78948974609375
+Extents: 0,768,768,1000,0,768
+Data: torch.Size([1, 1, 768, 232, 768]) from full extents (1000, 1000, 1000). IO time loading data:  0.5641
+Chunk 0,768,768,1000,0,768 SSE: 1353.428955078125
+Extents: 0,768,768,1000,768,1000
+Data: torch.Size([1, 1, 768, 232, 232]) from full extents (1000, 1000, 1000). IO time loading data:  0.2520
+Chunk 0,768,768,1000,768,1000 SSE: 0.0
+Extents: 768,1000,0,768,0,768
+Data: torch.Size([1, 1, 232, 768, 768]) from full extents (1000, 1000, 1000). IO time loading data:  0.6050
+Chunk 768,1000,0,768,0,768 SSE: 781.5331420898438
+Extents: 768,1000,0,768,768,1000
+Data: torch.Size([1, 1, 232, 768, 232]) from full extents (1000, 1000, 1000). IO time loading data:  0.2370
+Chunk 768,1000,0,768,768,1000 SSE: 451.5026550292969
+Extents: 768,1000,768,1000,0,768
+Data: torch.Size([1, 1, 232, 232, 768]) from full extents (1000, 1000, 1000). IO time loading data:  0.2442
+Chunk 768,1000,768,1000,0,768 SSE: 0.0
+Extents: 768,1000,768,1000,768,1000
+Data: torch.Size([1, 1, 232, 232, 232]) from full extents (1000, 1000, 1000). IO time loading data:  0.1172
+Chunk 768,1000,768,1000,768,1000 SSE: 0.0
+MSE: tensor([2.3763e-05], device='cuda:0'), shape [1000, 1000, 1000]
+Data min/max: 3.523324358839197e-27/0.5003551840782166
+PSNR:  40.227
+Time for 100 passes with batch size 8388608: 7.7910802364349365
+Throughput: 107669382.74837331 points per second
+ 2.41GB of memory used during test.
+Model was trained with TCNN and TCNN is available.
+APMGSRN(
+  (encoder): APMG_encoder()
+  (decoder): Network(n_input_dims=64, n_output_dims=1, seed=1337, dtype=torch.float16, hyperparams={'encoding': {'offset': 0.0, 'otype': 'Identity', 'scale': 1.0}, 'network': {'activation': 'ReLU', 'n_hidden_layers': 2, 'n_neurons': 64, 'otype': 'FullyFusedMLP', 'output_activation': 'None'}, 'otype': 'NetworkWithInputEncoding'})
+)
+Extents: 0,768,0,768,0,768
+Data: torch.Size([1, 1, 768, 768, 768]) from full extents (1000, 1000, 1000). IO time loading data:  1.6067
+Chunk 0,768,0,768,0,768 SSE: 20782.505859375
+Extents: 0,768,0,768,768,1000
+Data: torch.Size([1, 1, 768, 768, 232]) from full extents (1000, 1000, 1000). IO time loading data:  0.5920
+Chunk 0,768,0,768,768,1000 SSE: 393.78948974609375
+Extents: 0,768,768,1000,0,768
+Data: torch.Size([1, 1, 768, 232, 768]) from full extents (1000, 1000, 1000). IO time loading data:  0.5850
+Chunk 0,768,768,1000,0,768 SSE: 1353.428955078125
+Extents: 0,768,768,1000,768,1000
+Data: torch.Size([1, 1, 768, 232, 232]) from full extents (1000, 1000, 1000). IO time loading data:  0.2563
+Chunk 0,768,768,1000,768,1000 SSE: 0.0
+Extents: 768,1000,0,768,0,768
+Data: torch.Size([1, 1, 232, 768, 768]) from full extents (1000, 1000, 1000). IO time loading data:  0.6074
+Chunk 768,1000,0,768,0,768 SSE: 781.5331420898438
+Extents: 768,1000,0,768,768,1000
+Data: torch.Size([1, 1, 232, 768, 232]) from full extents (1000, 1000, 1000). IO time loading data:  0.2522
+Chunk 768,1000,0,768,768,1000 SSE: 451.5026550292969
+Extents: 768,1000,768,1000,0,768
+Data: torch.Size([1, 1, 232, 232, 768]) from full extents (1000, 1000, 1000). IO time loading data:  0.2520
+Chunk 768,1000,768,1000,0,768 SSE: 0.0
+Extents: 768,1000,768,1000,768,1000
+Data: torch.Size([1, 1, 232, 232, 232]) from full extents (1000, 1000, 1000). IO time loading data:  0.1290
+Chunk 768,1000,768,1000,768,1000 SSE: 0.0
+MSE: tensor([2.3763e-05], device='cuda:0'), shape [1000, 1000, 1000]
+Data min/max: 3.523324358839197e-27/0.5003551840782166
+PSNR:  40.227
+Time for 100 passes with batch size 8388608: 2.0369653701782227
+Throughput: 411818881.30312425 points per second
+ 2.41GB of memory used during test.

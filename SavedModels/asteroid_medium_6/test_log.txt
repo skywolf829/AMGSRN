@@ -1,0 +1,35 @@
+Model was trained with TCNN and TCNN is available.
+APMGSRN(
+  (encoder): APMG_encoder()
+  (decoder): Network(n_input_dims=64, n_output_dims=1, seed=1337, dtype=torch.float16, hyperparams={'encoding': {'offset': 0.0, 'otype': 'Identity', 'scale': 1.0}, 'network': {'activation': 'ReLU', 'n_hidden_layers': 2, 'n_neurons': 64, 'otype': 'FullyFusedMLP', 'output_activation': 'None'}, 'otype': 'NetworkWithInputEncoding'})
+)
+Extents: 0,768,0,768,0,768
+Data: torch.Size([1, 1, 768, 768, 768]) from full extents (1000, 1000, 1000). IO time loading data:  1.6349
+Chunk 0,768,0,768,0,768 SSE: 30663.728515625
+Extents: 0,768,0,768,768,1000
+Data: torch.Size([1, 1, 768, 768, 232]) from full extents (1000, 1000, 1000). IO time loading data:  0.5772
+Chunk 0,768,0,768,768,1000 SSE: 518.5059814453125
+Extents: 0,768,768,1000,0,768
+Data: torch.Size([1, 1, 768, 232, 768]) from full extents (1000, 1000, 1000). IO time loading data:  0.5962
+Chunk 0,768,768,1000,0,768 SSE: 1965.413818359375
+Extents: 0,768,768,1000,768,1000
+Data: torch.Size([1, 1, 768, 232, 232]) from full extents (1000, 1000, 1000). IO time loading data:  0.2480
+Chunk 0,768,768,1000,768,1000 SSE: 0.0
+Extents: 768,1000,0,768,0,768
+Data: torch.Size([1, 1, 232, 768, 768]) from full extents (1000, 1000, 1000). IO time loading data:  0.5952
+Chunk 768,1000,0,768,0,768 SSE: 821.0082397460938
+Extents: 768,1000,0,768,768,1000
+Data: torch.Size([1, 1, 232, 768, 232]) from full extents (1000, 1000, 1000). IO time loading data:  0.2580
+Chunk 768,1000,0,768,768,1000 SSE: 671.92431640625
+Extents: 768,1000,768,1000,0,768
+Data: torch.Size([1, 1, 232, 232, 768]) from full extents (1000, 1000, 1000). IO time loading data:  0.2480
+Chunk 768,1000,768,1000,0,768 SSE: 0.0
+Extents: 768,1000,768,1000,768,1000
+Data: torch.Size([1, 1, 232, 232, 232]) from full extents (1000, 1000, 1000). IO time loading data:  0.1212
+Chunk 768,1000,768,1000,768,1000 SSE: 0.0
+MSE: tensor([3.4641e-05], device='cuda:0'), shape [1000, 1000, 1000]
+Data min/max: 3.523324358839197e-27/0.5003551840782166
+PSNR:  38.590
+Time for 100 passes with batch size 8388608: 1.9759457111358643
+Throughput: 424536360.11982554 points per second
+ 2.41GB of memory used during test.

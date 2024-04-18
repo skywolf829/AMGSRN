@@ -1,0 +1,47 @@
+[    
+    [ "test.py",
+        {        
+        "load_from": "asteroid_medium_1",
+        "tests": "psnr,throughput"
+    }],
+    [ "test.py",
+        {        
+        "load_from": "asteroid_medium_2",
+        "tests": "psnr,throughput"
+    }],
+    [ "test.py",
+        {        
+        "load_from": "asteroid_medium_3",
+        "tests": "psnr,throughput"
+    }],
+    [ "test.py",
+        {        
+        "load_from": "asteroid_medium_4",
+        "tests": "psnr,throughput"
+    }],
+    [ "test.py",
+        {        
+        "load_from": "asteroid_medium_5",
+        "tests": "psnr,throughput"
+    }],
+    [ "test.py",
+        {        
+        "load_from": "asteroid_medium_6",
+        "tests": "psnr,throughput"
+    }],
+    [ "test.py",
+        {        
+        "load_from": "asteroid_medium_7",
+        "tests": "psnr,throughput"
+    }],
+    [ "test.py",
+        {        
+        "load_from": "asteroid_medium_8",
+        "tests": "psnr,throughput"
+    }],
+    [ "test.py",
+    {        
+    "load_from": "asteroid_medium_9",
+    "tests": "psnr,throughput,reconstruction"
+}]
+]

@@ -149,7 +149,6 @@ __global__ void encodeForwardKernel(
 
 
     auto idx = blockIdx.x * blockDim.x + threadIdx.x;
-    auto grid_idx = blockIdx.y;
     if (idx >= num_points) return;
 
     // Grab the query point into local registers
@@ -158,12 +157,13 @@ __global__ void encodeForwardKernel(
                     query_points[3 * idx + 2]);
 
     // Transform the point into local space for the grid using pre-computed rotation matrix
-    float3 point_t = transformPoint(&rotation_matrices[9*grid_idx], &translations[3*grid_idx], point);
-    // Perform feature grid trilinear interpolation and write the result directly to the output
-    trilinearInterpolate(&feature_grids[grid_idx*features_per_grid*D*H*W], 
-        features_per_grid, D, H, W, point_t, 
-        &output_features[idx*num_grids*features_per_grid + features_per_grid*grid_idx]);
-    
+    for(auto grid_idx = 0; grid_idx < num_grids; grid_idx++){
+        float3 point_t = transformPoint(&rotation_matrices[9*grid_idx], &translations[3*grid_idx], point);
+        // Perform feature grid trilinear interpolation and write the result directly to the output
+        trilinearInterpolate(&feature_grids[grid_idx*features_per_grid*D*H*W], 
+            features_per_grid, D, H, W, point_t, 
+            &output_features[idx*num_grids*features_per_grid + features_per_grid*grid_idx]);
+    }
 }
 
 __global__ void encodeBackwardKernel(
@@ -181,20 +181,20 @@ __global__ void encodeBackwardKernel(
     float* dL_dFeatureGrids) {
     
     auto idx = blockIdx.x * blockDim.x + threadIdx.x;
-    auto grid_idx = blockIdx.y;
     if (idx >= num_points) return;
 
     // Grab the query point into local registers
     float3 point = make_float3(query_points[3 * idx],query_points[3 * idx + 1], query_points[3 * idx + 2]);
 
-    // Transform the point into local space for the grid using pre-computed rotation matrix
-    float3 point_t = transformPoint(&rotation_matrices[9*grid_idx], &translations[3*grid_idx], point);
-    // Perform feature grid trilinear interpolation and write the result directly to the output
-    trilinearInterpolateBackwards(&dL_dFeatureGrids[grid_idx*features_per_grid*D*H*W], 
-        features_per_grid, D, H, W, point_t, 
-        &dL_dFeatureVectors[idx*num_grids*features_per_grid + features_per_grid*grid_idx]
-    );
-    
+    for(auto grid_idx = 0; grid_idx < num_grids; ++grid_idx){
+        // Transform the point into local space for the grid using pre-computed rotation matrix
+        float3 point_t = transformPoint(&rotation_matrices[9*grid_idx], &translations[3*grid_idx], point);
+        // Perform feature grid trilinear interpolation and write the result directly to the output
+        trilinearInterpolateBackwards(&dL_dFeatureGrids[grid_idx*features_per_grid*D*H*W], 
+            features_per_grid, D, H, W, point_t, 
+            &dL_dFeatureVectors[idx*num_grids*features_per_grid + features_per_grid*grid_idx]
+        );
+    }
 }
 
 __global__ void densityForwardKernel(
@@ -638,9 +638,9 @@ void launch_encode_forward(
         rotation_matrices
     );
 
-    dim3 gridDims((num_points + THREADS_PER_BLOCK - 1) / THREADS_PER_BLOCK, num_grids);
+    blocksPerGrid = (num_points + THREADS_PER_BLOCK - 1) / THREADS_PER_BLOCK;
     // Next, perform interpolation
-    encodeForwardKernel<<<gridDims, THREADS_PER_BLOCK>>>(
+    encodeForwardKernel<<<blocksPerGrid, THREADS_PER_BLOCK>>>(
         num_points, 
         num_grids, 
         features_per_grid,
@@ -681,9 +681,9 @@ void launch_encode_backward(
         rotation_matrices
     );
 
-    dim3 gridDims((num_points + THREADS_PER_BLOCK - 1) / THREADS_PER_BLOCK, num_grids);
+    blocksPerGrid = (num_points + THREADS_PER_BLOCK - 1) / THREADS_PER_BLOCK;
     // Next, perform interpolation (backward)
-    encodeBackwardKernel<<<gridDims, THREADS_PER_BLOCK>>>(
+    encodeBackwardKernel<<<blocksPerGrid, THREADS_PER_BLOCK>>>(
         num_points, 
         num_grids, 
         features_per_grid,
