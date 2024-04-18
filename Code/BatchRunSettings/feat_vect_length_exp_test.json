@@ -1,0 +1,27 @@
+[    
+    [ "test.py",
+        {        
+        "load_from": "8feats_128grids",
+        "tests": "psnr,throughput,reconstruction"
+    }],
+    [ "test.py",
+        {        
+        "load_from": "16feats_128grids",
+        "tests": "psnr,throughput,reconstruction"
+    }],
+    [ "test.py",
+        {        
+        "load_from": "32feats_128grids",
+        "tests": "psnr,throughput,reconstruction"
+    }],
+    [ "test.py",
+        {        
+        "load_from": "64feats_128grids",
+        "tests": "psnr,throughput,reconstruction"
+    }],
+    [ "test.py",
+        {        
+        "load_from": "128feats_128grids",
+        "tests": "psnr,throughput,reconstruction"
+    }]
+]

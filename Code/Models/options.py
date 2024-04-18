@@ -12,6 +12,7 @@ class Options():
         opt['feature_grid_shape']                   = "8,8,8"   
         opt['n_features']                           = 2      
         opt['n_grids']                              = 64
+        opt['feature_vector_length']                = None
         opt['num_positional_encoding_terms']        = 6
         opt['extents']                              = None
         opt['use_bias']                             = False

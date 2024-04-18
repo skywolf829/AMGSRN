@@ -707,5 +707,31 @@ class TestEncode(unittest.TestCase):
         torch.testing.assert_close(feat_grid_grads_cuda, feat_grid_grads_torch, 
             rtol=0.1, atol=1e-5)
 
+    def test_gradient_batch_featurewrap(self):
+        num_grids = 16
+        num_points = 2**20
+        feature_vector_length = 8
+        r, s, t = get_random_rst(batch_size=num_grids)
+        feature_grids = get_random_feature_grids(num_grids, 2, [16,16,16])
+        points = get_random_points(batch_size=num_points)
+        
+        # Torch pass
+        out_feats_torch = encode_pytorch(feature_grids, r, s, t, points, feature_vector_length)
+        l_torch = (out_feats_torch**2).sum()
+        l_torch.backward()
+        feat_grid_grads_torch = feature_grids.grad.clone()
+
+        feature_grids.grad = None
+
+        # CUDA pass
+        out_feats_cuda = encode(points, r, s, t, feature_grids, feature_vector_length)
+        l_cuda = (out_feats_cuda**2).sum()
+        l_cuda.backward()
+        feat_grid_grads_cuda = feature_grids.grad.clone()
+
+        # Verify
+        torch.testing.assert_close(feat_grid_grads_cuda, feat_grid_grads_torch, 
+            rtol=0.1, atol=1e-5)
+        
 if __name__ == '__main__':
     unittest.main()

@@ -362,7 +362,9 @@ if __name__ == '__main__':
     parser.add_argument('--feature_grid_shape',default=None,type=str,
         help='Resolution for feature grid')
     parser.add_argument('--n_features',default=None,type=int,
-        help='Number of features in the feature grid')       
+        help='Number of features in the feature grid')      
+    parser.add_argument('--feature_vector_length',default=None,type=int,
+        help='Length of feature vector')        
     parser.add_argument('--n_grids',default=None,type=int,
         help='Number of grids for APMGSRN')
     parser.add_argument('--num_positional_encoding_terms',default=None,type=int,

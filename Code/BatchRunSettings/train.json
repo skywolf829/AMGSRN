@@ -1,12 +1,13 @@
 [
     [ "train.py",
         {        
-            "save_name": "temp",
+            "save_name": "128feats_128grids",
             "model": "APMGSRN",
             "data": "asteroid.nc",
-            "n_features": 2,
-            "n_grids": 16,
-            "feature_grid_shape": "32,32,32",
+            "n_features": 1,
+            "n_grids": 128,
+            "feature_vector_length": 128,
+            "feature_grid_shape": "16,16,16",
             "n_layers": 2,
             "nodes_per_layer": 64,
             "precondition": false,

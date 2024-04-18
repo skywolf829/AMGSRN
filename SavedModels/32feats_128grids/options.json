@@ -46,7 +46,7 @@
     "profile": false,
     "requires_padded_feats": false,
     "save_every": 0,
-    "save_name": "temp",
+    "save_name": "32feats_128grids",
     "transform_lr": 0.001,
     "use_bias": false,
     "use_global_position": false,

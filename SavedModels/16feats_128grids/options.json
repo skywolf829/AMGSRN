@@ -12,7 +12,7 @@
     "ensemble_grid": "1,1,1",
     "extents": null,
     "feature_grid_shape": "16,16,16",
-    "feature_vector_length": 32,
+    "feature_vector_length": 16,
     "full_shape": [
         1000,
         1000,
@@ -46,7 +46,7 @@
     "profile": false,
     "requires_padded_feats": false,
     "save_every": 0,
-    "save_name": "temp",
+    "save_name": "16feats_128grids",
     "transform_lr": 0.001,
     "use_bias": false,
     "use_global_position": false,

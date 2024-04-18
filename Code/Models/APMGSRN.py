@@ -14,9 +14,11 @@ def weights_init(m):
 
 class APMG_encoder(nn.Module):
     def __init__(self, n_grids:int, n_features:int,
-                 feat_grid_shape:List[int], n_dims:int,
+                 feat_grid_shape:List[int], feature_vector_length:int,
+                 n_dims:int,
                  grid_initializaton:str = None):
         super(APMG_encoder, self).__init__()
+        self.feature_vector_length = feature_vector_length
 
         self.init_activations()
         self.randomize_grids(n_grids, n_features, feat_grid_shape, n_dims)
@@ -120,7 +122,8 @@ class APMG_encoder(nn.Module):
         return feature_density(x, self.rotations, self.scales, self.translations)  
      
     def forward(self, x : torch.Tensor) -> torch.Tensor:
-        return encode(x, self.rotations, self.scales, self.translations, self.feature_grids)
+        return encode(x, self.rotations, self.scales, self.translations, 
+                      self.feature_grids, self.feature_vector_length)
 
 class APMGSRN(nn.Module):
     def __init__(self, opt):
@@ -136,19 +139,21 @@ class APMGSRN(nn.Module):
         self.requires_padded_feats : bool = opt['requires_padded_feats']
         self.padding_size : int = 0
         self.full_shape = opt['full_shape']
+        self.feature_vector_length = opt['feature_vector_length']
+        if(opt['feature_vector_length'] is None):
+            self.feature_vector_length = self.n_features*self.n_grids
+        
         if(opt['requires_padded_feats']):
             self.padding_size : int = 16*int(math.ceil(max(1, (opt['n_grids']*opt['n_features'] )/16))) - \
                 opt['n_grids']*opt['n_features'] 
             
         self.encoder = APMG_encoder(opt['n_grids'], opt['n_features'] , 
-            self.feature_grid_shape, opt['n_dims'], opt['grid_initialization'])
+            self.feature_grid_shape, self.feature_vector_length, opt['n_dims'], opt['grid_initialization'])
         
         
         def init_decoder_tcnn():
             import tinycudann as tcnn 
-            input_size:int = opt['n_features']*opt['n_grids'] # + 6*3*2
-            if(opt['requires_padded_feats']):
-                input_size = opt['n_features']*opt['n_grids'] + self.padding_size
+            input_size:int = self.feature_vector_length
                 
             decoder = tcnn.Network(
                 n_input_dims=input_size,
@@ -167,9 +172,7 @@ class APMGSRN(nn.Module):
         def init_decoder_pytorch():
             decoder = nn.ModuleList()   
             
-            first_layer_input_size:int = opt['n_features']*opt['n_grids'] # + 6*3*2
-            if(opt['requires_padded_feats']):
-                first_layer_input_size = opt['n_features']*opt['n_grids'] + self.padding_size
+            first_layer_input_size:int = self.feature_vector_length
                                            
             layer = ReLULayer(first_layer_input_size, 
                 opt['nodes_per_layer'], bias=opt['use_bias'], dtype=torch.float32)
