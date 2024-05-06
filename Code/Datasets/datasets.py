@@ -36,12 +36,14 @@ class Dataset(torch.utils.data.Dataset):
         else:
             self.min_ = self.data.min()
             return self.min_
+        
     def mean(self):
         if self.mean_ is not None:
             return self.mean_
         else:
             self.mean_ = self.data.mean()
             return self.mean_
+        
     def max(self):
         if self.max_ is not None:
             return self.max_

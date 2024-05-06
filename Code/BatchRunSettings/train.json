@@ -1,11 +1,11 @@
 [
     [ "train.py",
         {        
-            "save_name": "temp",
+            "save_name": "supernova_medium_1",
             "model": "APMGSRN",
-            "data": "asteroid.nc",
-            "n_features": 2,
-            "n_grids": 16,
+            "data": "supernova1327.h5",
+            "n_features": 1,
+            "n_grids": 32,
             "feature_grid_shape": "32,32,32",
             "n_layers": 2,
             "nodes_per_layer": 64,

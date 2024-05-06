@@ -428,7 +428,9 @@ def nc_to_tensor(location, opt = None):
             d = np.array(f[a][ext[0]:ext[1],ext[2]:ext[3],ext[4]:ext[5]])
         channels.append(d)
     d = np.stack(channels)
-    d = torch.tensor(d).unsqueeze(0)
+    d = torch.tensor(d)
+    if('.nc' in location):
+        d = d.unsqueeze(0)
     #print(f"Loaded data with shape {d.shape} (full shape: {full_shape})")
     return d, full_shape
         
