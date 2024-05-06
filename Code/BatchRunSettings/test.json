@@ -1,7 +1,12 @@
 [    
     [ "test.py",
         {        
-        "load_from": "temp",
-        "tests": "psnr,throughput,reconstruction"
+        "load_from": "supernova_medium_new",
+        "tests": "psnr,throughput"
+    }],
+    [ "test.py",
+        {        
+        "load_from": "supernova_medium_old",
+        "tests": "psnr,throughput"
     }]
 ]

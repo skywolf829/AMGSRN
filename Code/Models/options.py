@@ -6,7 +6,7 @@ class Options():
         opt = {}
 
         # For descriptions of all variables, see train.py
-        opt['model']                                = 'AMRSRN'
+        opt['model']                                = 'AMGSRN'
         opt['n_dims']                               = 3       
         opt['n_outputs']                            = 1
         opt['feature_grid_shape']                   = "8,8,8"   

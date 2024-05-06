@@ -145,16 +145,15 @@ def create_model(opt):
             from Models.fVSRN import fVSRN_NGP
             return fVSRN_NGP(opt)
         elif(opt['model'] == "APMGSRN" or opt['model'] == "AMGSRN"):
-            from Models.APMGSRN import APMGSRN
-            return APMGSRN(opt)
+            from Models.AMGSRN import AMGSRN
+            return AMGSRN(opt)
+        elif(opt['model'] == "APMGSRN_old" or opt['model'] == "AMGSRN_old"):
+            from Models.AMGSRN_old import AMGSRN_old
+            return AMGSRN_old(opt)
         elif(opt['model'] == "NGP"):
             from Models.NGP import NGP
             return NGP(opt)
-        elif(opt['model'] == "NGP_TCNN"):        
-            from Models.NGP import NGP_TCNN
-            return NGP_TCNN(opt)
    
-
 def sample_grid(model, grid, align_corners:bool = False,
                 device:str="cuda", data_device:str="cuda", max_points:int = 100000):
     coord_grid = make_coord_grid(grid, 

@@ -308,7 +308,6 @@ def nc_to_raw(name):
     with open(os.path.join(data_folder, f"{name.split('.')[0]}.raw"), 'wb') as f:
         data.tofile(f)  
     
-
 class Rect():
     def __init__(self, x, y, w, h):
         self.x = x
@@ -454,7 +453,21 @@ def table2_test():
     print()
     print()
     
+def chameleon():
+    path = os.path.join(data_folder, "chameleon_1024x1024x1080_uint16.raw")
+    d = np.fromfile(path, dtype=np.uint16).reshape(1080,1024,1024)
+    d = d.astype(np.float32) / ((2**16)-1)
+    print(d.max())
+    np_to_nc(d, "chameleon.nc")
+
+def woodbranch():
+    path = os.path.join(data_folder, "woodbranch_2048x2048x2048_uint16.raw")
+    d = np.fromfile(path, dtype=np.uint16).reshape(2048,2048,2048)
+    d = d.astype(np.float32) / ((2**16)-1)
+    print(d.max())
+    np_to_nc(d, "woodbranch.nc")
+
 if __name__ == '__main__':
     
-    
+    woodbranch()
     quit()

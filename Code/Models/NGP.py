@@ -3,7 +3,7 @@ import torch.nn as nn
 from math import exp, log
 import tinycudann as tcnn
 
-class NGP_TCNN(nn.Module):
+class NGP(nn.Module):
     def __init__(self, opt) -> None:
         super().__init__()
         self.opt = opt

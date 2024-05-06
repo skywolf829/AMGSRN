@@ -289,7 +289,7 @@ def train( model, dataset, opt):
 
     # choose the specific training iteration function based on the model
     
-    if("APMGSRN" in opt['model']):
+    if("APMGSRN" in opt['model'] or "AMGSRN" in opt['model']):
         train_step = train_step_APMGSRN
         optimizer = [
             optim.Adam(
