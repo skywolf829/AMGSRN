@@ -1,6 +1,7 @@
 import torch
 import torch.nn as nn
 from Models.layers import ReLULayer
+from Other.utility_functions import make_coord_grid
 from typing import List, Optional
 import math
 from AMG_Encoder import create_transformation_matrices, encode, feature_density
@@ -166,6 +167,40 @@ class AMGSRN(nn.Module):
             )
             self.decoder.apply(weights_init)   
 
+    def check_grid_influence(self, data):
+        delta_errors = []
+        with torch.no_grad():
+            # create a [-1, 1]^3 grid
+            x = make_coord_grid([64, 64, 64], self.feature_grids.device, flatten=True, 
+                        align_corners=True)
+            # Get the global position for each grid's extents
+            # [n_grids, 64*64*64, 3]
+            x = self.inverse_transform(x)
+
+            # Iterate over each grid to find the effect of removing the grid
+            for i in range(self.n_grids):
+                # Sample points within the grid
+                points = x[i]
+                # Find true data values
+                vals = data.sample_values(points)
+                # obtain feature values
+                feats = encode(points, self.rotations, self.scales, self.translations, self.feature_grids)
+                # find original network output (no change)
+                y = self.decoder(feats).float() * (self.volume_max - self.volume_min) + self.volume_min
+                # 0 the feature for this grid and see the output change
+                feats[:,i] = 0  
+                y_grid_removed = self.decoder(feats).float() * (self.volume_max - self.volume_min) + self.volume_min
+
+                # compute error (RMSE) for both
+                error_no_change = ((vals - y)**2).mean() ** 0.5
+                error_grid_removed = ((vals - y_grid_removed)**2).mean() ** 0.5
+
+                # keep the delta error. Higher means the grid has large influence. Lower means it is not as important.
+                delta_error = error_grid_removed - error_no_change
+                delta_errors.append(delta_error.item())
+        # return the per-grid delta errors
+        return delta_errors
+    
     def transform(self, x : torch.Tensor) -> torch.Tensor:
         '''
         Transforms global coordinates x to local coordinates within

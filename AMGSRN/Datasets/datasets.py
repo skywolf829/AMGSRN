@@ -75,8 +75,6 @@ class Dataset(torch.utils.data.Dataset):
         print(vals.shape)
         return vals
 
-    
-    
     def total_points(self):
         t = 1
         for i in range(2, len(self.data.shape)):
@@ -90,11 +88,9 @@ class Dataset(torch.utils.data.Dataset):
                     align_corners=self.opt['align_corners'])
         return self.full_coord_grid
         
-    def get_random_points(self, n_points):        
-        
-        x = torch.rand([1, 1, 1, n_points, self.opt['n_dims']], 
-                device=self.opt['data_device']) * 2 - 1
-        
+    def sample_values(self, points):
+
+        x = points[None,None,None,...].to(self.opt['data_device'])
         y = F.grid_sample(self.data,
             x, mode='bilinear', 
             align_corners=self.opt['align_corners'])
@@ -105,6 +101,13 @@ class Dataset(torch.utils.data.Dataset):
             y = y.unsqueeze(0)    
         
         y = y.permute(1,0)
+        return y
+    
+    def get_random_points(self, n_points):
+        
+        x = torch.rand([n_points, self.opt['n_dims']], 
+                device=self.opt['data_device']) * 2 - 1
+        y = self.sample_values(x)
         return x, y
 
     def __len__(self):

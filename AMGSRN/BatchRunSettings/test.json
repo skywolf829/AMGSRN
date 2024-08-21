@@ -2,11 +2,11 @@
     [ "test.py",
         {        
         "load_from": "supernova_medium_new",
-        "tests": "psnr,throughput"
+        "tests": "psnr"
     }],
     [ "test.py",
         {        
         "load_from": "supernova_medium_old",
-        "tests": "psnr,throughput"
+        "tests": "psnr"
     }]
 ]

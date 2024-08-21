@@ -287,7 +287,7 @@ def str2bool(v):
     else:
         raise argparse.ArgumentTypeError('Boolean value expected.')
 
-def make_coord_grid(shape, device, flatten=True, align_corners=False, use_half=False):
+def make_coord_grid(shape, device, flatten=True, align_corners=True, use_half=False):
     """ 
     Make coordinates at grid centers.
     return (shape.prod, 3) matrix with (z,y,x) coordinate

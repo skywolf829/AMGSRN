@@ -1,4 +1,24 @@
 # AMGSRN
-Improvements over APMGSRN 
+Improvements over APMGSRN.
 
-conda env create --file=env.yml
+
+## Installation
+`
+source tools/setup_env.sh
+`
+
+
+## Training
+`
+conda activate .venv
+python AMGSRN/start_jobs.py --settings train.json
+`
+
+## Testing
+`
+conda activate .venv
+python AMGSRN/start_jobs.py --settings test.json
+`
+
+## Web renderer
+TODO

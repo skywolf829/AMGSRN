@@ -8,6 +8,7 @@ from Datasets.datasets import Dataset
 import torch
 import numpy as np
 import torch.nn.functional as F
+import time
 
 project_folder_path = os.path.dirname(os.path.abspath(__file__))
 project_folder_path = os.path.join(project_folder_path, "..")
@@ -118,6 +119,20 @@ def test_psnr(model, opt):
     
     print(f"PSNR: {y : 0.03f}")
     return y, SSE, MSE, data.numel()
+
+def test_grid_influence(model, opt):
+    data = Dataset(opt)
+    torch.cuda.synchronize()
+    t0 = time.time()
+    grid_influences = model.check_grid_influence(data)
+    torch.cuda.synchronize()
+    t1 = time.time()
+    print("Grid influences on MSE. Higher means the grid has more positive impact on quality.")
+    print(f"Test took {t1-t0:0.02f} seconds")
+    print(grid_influences)
+
+    worst = np.argmin(grid_influences)
+    print(f"Weakest influence - grid {worst}: {grid_influences[worst] :0.08f} RMSE")
 
 def test_psnr_chunked(model, opt):
     
@@ -249,7 +264,6 @@ def test_throughput(model, opt):
     with torch.no_grad():
         input_data :torch.Tensor = torch.rand([batch, 3], device=opt['device'], dtype=torch.float32)
 
-        import time
         torch.cuda.synchronize()
         t0 = time.time()
         for i in range(num_forward):
@@ -357,6 +371,8 @@ def perform_tests(model, tests, opt):
         data_hist(model, opt)
     if("throughput" in tests):
         test_throughput(model, opt)
+    if("grid_influence" in tests):
+        test_grid_influence(model, opt)
     
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Evaluate a model on some tests')

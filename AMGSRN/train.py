@@ -306,10 +306,10 @@ def train( model, dataset, opt):
         scheduler = [
             torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer[0],
                 mode="min", patience=500, threshold=1e-4, threshold_mode="rel",
-                cooldown=250,factor=0.1,verbose=True),
+                cooldown=250,factor=0.1),
             torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer[1], 
                 mode="min", patience=500, threshold=1e-5, threshold_mode="rel",
-                cooldown=250,factor=0.5,verbose=True)
+                cooldown=250,factor=0.5)
         ]      
         early_stopping_data = (False, False,
             torch.zeros([opt['iterations']], 

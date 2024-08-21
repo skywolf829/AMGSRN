@@ -110,7 +110,7 @@ def load_model(opt, device):
 
     if(not opt['ensemble']):
         ckpt = torch.load(os.path.join(path_to_load, 'model.ckpt.tar'), 
-            map_location = device)   
+            map_location = device, weights_only=False)   
 
         if('decoder.params' in ckpt['state_dict']):
             if(tcnn_installed):

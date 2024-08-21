@@ -20,7 +20,7 @@ to the same machine (on OSC, ThetaGPU, etc) that have multiple GPUs.
 This code will automatically queue one job per GPU and add another job
 to the GPU after the GPU is freed from the previous job.
 
-Settings files to run are in /Code/BatchRunSettings/
+Settings files to run are in /AMGSRN/BatchRunSettings/
 '''
 
 # Parses the settings JSON into a list of 
@@ -45,7 +45,7 @@ def build_commands(settings_path):
                 run_name = str(run_number)
                 command_names.append(run_name)        
                 
-                command_string = "python Code/" + str(script_name) + " --load_from " + fold + " " + \
+                command_string = "python AMGSRN/" + str(script_name) + " --load_from " + fold + " " + \
                     "--tests " + variables['tests'] + " "
                 commands.append(command_string)
                 
@@ -101,7 +101,7 @@ def build_commands(settings_path):
                         run_name = str(run_number)
 
                         command_names.append(run_name)           
-                        command = "python Code/" + str(script_name) + " "
+                        command = "python AMGSRN/" + str(script_name) + " "
                         
                         for var_name in variables.keys():
                             base_opt[var_name] = variables[var_name]
@@ -130,7 +130,7 @@ def build_commands(settings_path):
             
             run_name = str(run_number)
             command_names.append(run_name)           
-            command = "python Code/" + str(script_name) + " "
+            command = "python AMGSRN/" + str(script_name) + " "
             
             for var_name in variables.keys():
                 command = command + "--" + str(var_name) + " "
@@ -175,7 +175,7 @@ if __name__ == '__main__':
     
     args = vars(parser.parse_args())
 
-    settings_path = os.path.join(project_folder_path, "Code", "BatchRunSettings", args['settings'])
+    settings_path = os.path.join(project_folder_path, "AMGSRN", "BatchRunSettings", args['settings'])
     command_names, commands, log_locations = build_commands(settings_path)
 
     if(args['devices'] == "all"):
