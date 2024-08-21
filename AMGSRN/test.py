@@ -2,7 +2,7 @@ from __future__ import absolute_import, division, print_function
 import argparse
 import os
 from Other.utility_functions import PSNR, tensor_to_cdf, create_path, make_coord_grid
-from Models.models import load_model, sample_grid, forward_maxpoints
+from Models.models import load_model, sample_grid, forward_maxpoints, save_model
 from Models.options import load_options
 from Datasets.datasets import Dataset
 import torch
@@ -400,6 +400,7 @@ if __name__ == '__main__':
     opt['data_device'] = args['data_device']
     model = load_model(opt, args['device'])
     model = model.to(opt['device'])
+    save_model(model, opt)
     model.train(False)
     model.eval()
     print(model)

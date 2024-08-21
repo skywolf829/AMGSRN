@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>My Landing Page</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <div class="container">
+        <div class="renderer-container" id="renderer-container"></div>
+        <div class="drag-drop-area" id="drop-area">
+            <p>Drag & Drop the ZIP file here</p>
+            <pre id="json-content"></pre>
+            <pre id="bin-content"></pre>
+        </div>
+    </div>
+    
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.7.1/jszip.min.js"></script>
+    <script src="dist/bundle.js"></script>
+</body>
+</html>
