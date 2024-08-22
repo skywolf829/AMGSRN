@@ -400,7 +400,6 @@ if __name__ == '__main__':
     opt['data_device'] = args['data_device']
     model = load_model(opt, args['device'])
     model = model.to(opt['device'])
-    save_model(model, opt)
     model.train(False)
     model.eval()
     print(model)
