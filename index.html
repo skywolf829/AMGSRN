@@ -1,253 +1,189 @@
 <html lang="en">
 	<head>
-		<title>Lebarba - WebGL Volume Rendering made easy</title>
+		<title>AMGSRN Neural Volume Render</title>
 		<meta charset="utf-8">
 		<meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">
 		<link rel="stylesheet" href="css/style.css">
 	</head>
 	<body>
-		
-		<div class="container", id="container">
-			<div class="renderer-container" id="renderer-container">
-
-			<div>
-				<div>Transfer function</div>
-				0.0<img id="transferFunctionImg"/>1.0
-			</div>
-			</div>
-			
-			
+		<div id="info">
+			<div id="timestamps" style="
+				position: absolute;
+				top: 60px;
+				left: 0;
+				padding: 10px;
+				background: rgba( 0, 0, 0, 0.5 );
+				color: #fff;
+				font-family: monospace;
+				font-size: 12px;
+				line-height: 1.5;
+				pointer-events: none;
+				text-align: left;
+			"></div>
 		</div>
-		<script src="./js/three.min.js"></script>
-		<script src="./js/Detector.js"></script>
-		<script src="./js/stats.min.js"></script>
-		<script src="./js/OrbitControls.js"></script>
-		<script src="./js/dat.gui.min.js"></script>
+
+		
+		<script type="importmap">
+			{
+				"imports": {
+					"three": "./js/three.webgpu.168dev.js",
+					"three/tsl": "./js/three.webgpu.168dev.js",
+					"three/addons/": "./js/"
+				}
+			}
+		</script>
 		<script src="./js/jszip.min.js"></script>
+		<script type="module">
 
-		<script id="fragmentShaderFirstPass" type="x-shader/x-fragment">
-			varying vec3 worldSpaceCoords;
+			import * as THREE from 'three';
+			import { Fn, instanceIndex, pass, mrt, output,
+				float, vec3, uvec2, vec4, uint, vec2,
+				storage, textureStore, texture, uniform,
+				modelWorldMatrix, cameraViewMatrix, cameraProjectionMatrix, cameraPosition,
+				positionGeometry, positionLocal, positionWorld, positionView,
+				If, Break, Continue, Loop,
+				normalize, modelWorldMatrixInverse,
+				smoothstep, materialReference
+			 } from 'three/tsl';
 
-			void main()
-			{
-				//The fragment's world space coordinates as fragment output.
-				gl_FragColor = vec4( worldSpaceCoords.x, worldSpaceCoords.y, worldSpaceCoords.z, 1 );
-			}
-		</script>
-		<script id="vertexShaderFirstPass" type="x-shader/x-vertex">
-			varying vec3 worldSpaceCoords;
+			import { OrbitControls } from 'three/addons/OrbitControls.js';
+			import Stats from 'three/addons/stats.module.js';
+
+			import { GUI } from 'three/addons/lil-gui.module.min.js';
+
+			let material;
+			let postProcessing;
+			let camera, scene, renderer;
+			let controls, stats;
+			let computeShaderTexture;
+			let computeShader, compute_computeShader;
+			let scenePass;
+			let colorPass, maskPass;
+			let renderTarget;
+			let pixelBuffer, pixelBufferTexture;
+			let width, height;
+			let volumeWidth=uniform(1);
+			let volumeHeight = uniform(1);
+			let volumeDepth=uniform(1);
+			let modelLoaded = uniform(0).label('modelLoaded');
+			const timestamps = document.getElementById( 'timestamps' );
 			
-			uniform float boxWidth;
-			uniform float boxHeight;
-			uniform float boxDepth;
-
-			void main()
-			{
-				//Set the world space coordinates of the back faces vertices as output.
-				worldSpaceCoords = position + vec3(boxWidth / 2.0, boxHeight / 2.0, boxDepth / 2.0); //move it from [-0.5;0.5] to [0,1]
-				gl_Position = projectionMatrix * modelViewMatrix * vec4( position, 1.0 );
-			}
-		</script>
-		<script id="fragmentShaderSecondPass" type="x-shader/x-fragment">
-			// precision mediump float;
-			varying vec3 worldSpaceCoords;
-			varying vec4 projectedCoords;
-			uniform sampler2D tex, cubeTex, transferTex;
-			uniform mediump sampler3D volumeTexture; // 3D texture passed as a uniform
-			uniform float steps;
-			uniform float alphaCorrection;
-			uniform float boxWidth;
-			uniform float boxHeight;
-			uniform float boxDepth;
-			// The maximum distance through our rendering volume is sqrt(3).
-			// The maximum number of steps we take to travel a distance of 1 is 512.
-			// ceil( sqrt(3) * 512 ) = 887
-			// This prevents the back of the image from getting cut off when steps=512 & viewing diagonally.
-			const int MAX_STEPS = 887;
-
-			float linearScale(float domainStart, float domainEnd, float rangeStart, float rangeEnd, float value) {
-				return ((rangeEnd - rangeStart) * (value - domainStart)) / (domainEnd - domainStart) + rangeStart;
-			}
-
-			const float slicesPerSide = 16.0;
-			const float zDepth = slicesPerSide * slicesPerSide - 1.0;
-			
-			vec4 sampleVolume(vec3 position) {
-				// Sample the 3D texture using the texture coordinates
-				vec4 val = texture(volumeTexture, position);
-				vec4 color = texture2D( transferTex, vec2( val.r, 1.0) );
-				return color;
-				//return vec4(val.r, val.r, val.r, val.r);
-				//return vec4(position, val.r);
-			}
-
-			//Acts like a texture3D using Z slices and trilinear filtering.
-			vec4 sampleAs3DTexture( vec3 texCoord )
-			{
-				texCoord.x = linearScale(0.0, boxWidth, 0.0, 1.0, texCoord.x);
-				texCoord.y = linearScale(0.0, boxHeight, 0.0, 1.0, texCoord.y);
-
-				vec4 colorSlice1, colorSlice2;
-				vec2 texCoordSlice1, texCoordSlice2;
-
-				//The z coordinate determines which Z slice we have to look for.
-				//Z slice number goes from 0 to 255.
-				float zSliceNumber1 = floor(texCoord.z * zDepth);
-
-				//As we use trilinear we go the next Z slice.
-				float zSliceNumber2 = min( zSliceNumber1 + 1.0, zDepth); //Clamp to 255
-
-				//The Z slices are stored in a matrix of 16x16 of Z slices.
-				//The original UV coordinates have to be rescaled by the tile numbers in each row and column.
-				texCoord.xy /= slicesPerSide;
-
-				texCoordSlice1 = texCoordSlice2 = texCoord.xy;
-
-				//Add an offset to the original UV coordinates depending on the row and column number.
-				texCoordSlice1.x += (mod(zSliceNumber1, slicesPerSide ) / slicesPerSide);
-				texCoordSlice1.y += floor((zDepth - zSliceNumber1) / slicesPerSide) / slicesPerSide;
-
-				texCoordSlice2.x += (mod(zSliceNumber2, slicesPerSide ) / slicesPerSide);
-				texCoordSlice2.y += floor((zDepth - zSliceNumber2) / slicesPerSide) / slicesPerSide;
-
-				//Get the opacity value from the 2D texture.
-				//Bilinear filtering is done at each texture2D by default.
-				colorSlice1 = texture2D( cubeTex, texCoordSlice1 );
-				colorSlice2 = texture2D( cubeTex, texCoordSlice2 );
-
-				//Based on the opacity obtained earlier, get the RGB color in the transfer function texture.
-				colorSlice1.rgb = texture2D( transferTex, vec2( colorSlice1.a, 1.0) ).rgb;
-				colorSlice2.rgb = texture2D( transferTex, vec2( colorSlice2.a, 1.0) ).rgb;
-
-				//How distant is zSlice1 to ZSlice2. Used to interpolate between one Z slice and the other.
-				float zDifference = mod(texCoord.z * zDepth, 1.0);
-
-				//Finally interpolate between the two intermediate colors of each Z slice.
-				return mix(colorSlice1, colorSlice2, zDifference);
-			}
-
-
-			void main( void ) {
-
-				//Transform the coordinates it from [-1;1] to [0;1]
-				vec2 texc = vec2(((projectedCoords.x / projectedCoords.w) + 1.0 ) / 2.0,
-								((projectedCoords.y / projectedCoords.w) + 1.0 ) / 2.0 );
-
-				//The back position is the world space position stored in the texture.
-				vec3 backPos = texture2D(tex, texc).xyz;
-
-				//The front position is the world space position of the second render pass.
-				vec3 frontPos = worldSpaceCoords;
-
-				//Using NearestFilter for rtTexture mostly eliminates bad backPos values at the edges
-				//of the cube, but there may still be no valid backPos value for the current fragment.
-				if ((backPos.x == 0.0) && (backPos.y == 0.0))
-				{
-					gl_FragColor = vec4(0.0);
-					return;
-				}
-
-				//The direction from the front position to back position.
-				vec3 dir = backPos - frontPos;
-
-				float rayLength = length(dir);
-
-				//Calculate how long to increment in each step.
-				float delta = 1.0 / steps;
-
-				//The increment in each direction for each step.
-				vec3 deltaDirection = normalize(dir) * delta;
-				float deltaDirectionLength = length(deltaDirection);
-
-				//Start the ray casting from the front position.
-				vec3 currentPosition = frontPos;
-
-				//The color accumulator.
-				vec4 accumulatedColor = vec4(0.0);
-
-				//The alpha value accumulated so far.
-				float accumulatedAlpha = 0.0;
-
-				//How long has the ray travelled so far.
-				float accumulatedLength = 0.0;
-
-				//If we have twice as many samples, we only need ~1/2 the alpha per sample.
-				//Scaling by 256/10 just happens to give a good value for the alphaCorrection slider.
-				float alphaScaleFactor = 25.6 * delta;
-
-				vec4 colorSample;
-				float alphaSample;
-
-				//Perform the ray marching iterations
-				for(int i = 0; i < MAX_STEPS; i++)
-				{
-					//Get the voxel intensity value from the 3D texture.
-					// colorSample = sampleAs3DTexture( currentPosition );
-					colorSample = sampleVolume( currentPosition);
-					//Allow the alpha correction customization.
-					alphaSample = colorSample.a * alphaCorrection;
-
-					//Applying this effect to both the color and alpha accumulation results in more realistic transparency.
-					alphaSample *= (1.0 - accumulatedAlpha);
-
-					//Scaling alpha by the number of steps makes the final color invariant to the step size.
-					alphaSample *= alphaScaleFactor;
-
-					//Perform the composition.
-					accumulatedColor += colorSample * alphaSample;
-
-					//Store the alpha accumulated so far.
-					accumulatedAlpha += alphaSample;
-
-					//Advance the ray.
-					currentPosition += deltaDirection;
-					accumulatedLength += deltaDirectionLength;
-
-					//If the length traversed is more than the ray length, or if the alpha accumulated reaches 1.0 then exit.
-					if(accumulatedLength >= rayLength || accumulatedAlpha >= 1.0 )
-						break;
-				}
-
-				gl_FragColor  = accumulatedColor;
-				//gl_FragColor = vec4(1.0);
-			}
-		</script>
-
-		<script id="vertexShaderSecondPass" type="x-shader/x-vertex">
-			varying vec3 worldSpaceCoords;
-			varying vec4 projectedCoords;
-			
-			uniform float boxWidth;
-			uniform float boxHeight;
-			uniform float boxDepth;
-	
-			void main()
-			{
-				worldSpaceCoords = (modelMatrix * vec4(position + vec3(boxWidth / 2.0, boxHeight / 2.0, boxDepth / 2.0), 1.0 )).xyz;
-				gl_Position = projectionMatrix *  modelViewMatrix * vec4( position, 1.0 );
-				projectedCoords =  projectionMatrix * modelViewMatrix * vec4( position, 1.0 );
-			}
-		</script>
-
-		<script>
-			if ( ! Detector.webgl ) Detector.addGetWebGLMessage();
-
-			var container, stats;
-			var camera, sceneFirstPass, sceneSecondPass, renderer;
-
-			var clock = new THREE.Clock();
-			var rtTexture, transferTexture;
-			var cubeTextures = ['bonsai', 'foot', 'teapot'];
-			var histogram = [];
-			var guiControls;
-
-			var materialSecondPass;
 			init();
-			animate();
-			
-			document.addEventListener('DOMContentLoaded', function() {
-				const dropArea = document.getElementById('container');
 
+			function init() {
+
+				const { innerWidth, innerHeight } = window;
+				width = 512;
+				height = 512;
+				console.log(innerHeight);
+				computeShaderTexture = new THREE.StorageTexture( width, height );
+				renderTarget = new THREE.RenderTarget(
+					width,//innerWidth * devicePixelRatio,
+					height,//innerHeight * devicePixelRatio,
+					{ count: 4, minFilter: THREE.NearestFilter, magFilter: THREE.NearestFilter }
+				);
+				renderTarget.textures[0].format = THREE.RedFormat;
+				renderTarget.textures[0].type = THREE.UnsignedByteType;
+				renderTarget.textures[1].format = THREE.RGBAFormat;
+				renderTarget.textures[1].type = THREE.HalfFloatType;
+				renderTarget.textures[2].format = THREE.RGBAFormat;
+				renderTarget.textures[2].type = THREE.HalfFloatType;
+				renderTarget.textures[3].format = THREE.RGBAFormat;
+				renderTarget.textures[3].type = THREE.HalfFloatType;
+
+				//renderTarget.textures[ 0 ].name = 'output';
+				renderTarget.textures[ 0 ].name = 'mask';
+				renderTarget.textures[ 1 ].name = 'worldPos';
+				renderTarget.textures[ 2 ].name = 'localPos';
+				renderTarget.textures[ 3 ].name = 'rayDirection';
+				camera = new THREE.PerspectiveCamera( 50, innerWidth / innerHeight, .1, 1000 );
+				camera.position.set( 1, 1, 1 );
+
+				scene = new THREE.Scene();
+				scene.background =  new THREE.Color( 0x000000 );
+
+				const helper = new THREE.GridHelper( 60, 40, 0x303030, 0x303030 );
+				//scene.add( helper );
+				
+				material = new THREE.MeshBasicNodeMaterial( { color: 0xffffff } );
+				material.mrtNode = mrt({
+					mask: vec4(1.0),
+					worldPos: positionWorld,
+					localPos: positionLocal,
+					//rayDirection: normalize(positionWorld.sub(cameraPosition))
+					rayDirection: normalize(positionLocal.sub(modelWorldMatrixInverse.mul(vec4(cameraPosition, 1.0)).xyz))
+				});
+				material.colorNode = positionLocal;
+				const volumeBox = new THREE.Mesh( new THREE.BoxGeometry(volumeWidth.value, 
+					volumeHeight.value, volumeDepth.value), material );
+				//volumeBox.position.set(1,1,1);
+				scene.add( volumeBox );
+
+				renderer = new THREE.WebGPURenderer( { antialias: true, trackTimestamp: true } );
+				renderer.setPixelRatio( window.devicePixelRatio );
+				renderer.setSize( window.innerWidth, window.innerHeight );
+				renderer.setAnimationLoop( animate );
+				renderer.setMRT( mrt( {
+					mask: vec4( 0 ),
+					worldPos: vec4(0),
+					localPos: vec4(0),
+					rayDirection: vec4(0)
+				} ) );
+				
+				computeShader = Fn(() => {
+					
+					const w = uint(width);
+					const h = uint(height);
+					const posX = instanceIndex.modInt( w );
+					const posY = instanceIndex.div( w );
+					const indexUV = uvec2( posX, posY );
+					const indexNorm = vec2(float(posX).div(w), float(posY).div(h));
+					const maskValue = texture(renderTarget.textures[0], indexNorm);
+					const worldPos = texture(renderTarget.textures[1], indexNorm);
+					const localPos = texture(renderTarget.textures[2], indexNorm);
+					const rayDir = texture(renderTarget.textures[3], indexNorm);
+					const stepSize = float(0.001);
+
+					const c = vec3(0.0,0.0,0.0).toVar();
+					const x = vec3(localPos).toVar();
+
+					If(modelLoaded.equal(1), () => {
+						If(maskValue.r.equal(1), () => {							
+							Loop( { start: uint(0), end: uint( 1732 ), type: 'uint', condition: '<' }, ( { i } ) => {
+								If(x.x.lessThanEqual(float(0.5)).and(x.x.greaterThanEqual(float(-0.5)))
+									.and(x.y.lessThanEqual(float(0.5))).and(x.y.greaterThanEqual(float(-0.5)))
+									.and(x.z.lessThanEqual(float(0.5))).and(x.z.greaterThanEqual(float(-0.5))), () => {
+										c.addAssign(vec3(0.00043));
+								});
+								x.addAssign(rayDir.mul(stepSize));
+							});
+							//textureStore(computeShaderTexture, indexUV, localPos).toWriteOnly();
+							textureStore(computeShaderTexture, indexUV, vec4(c, 1.0)).toWriteOnly();
+						}).Else(() => {
+							textureStore(computeShaderTexture, indexUV, vec4(0,0,0,1)).toWriteOnly();
+						});
+					}).Else( () => {
+						textureStore(computeShaderTexture, indexUV, vec4(0,0,0,1)).toWriteOnly();
+					});
+					
+				});
+				compute_computeShader = computeShader().compute(width*height);
+
+
+				postProcessing = new THREE.PostProcessing( renderer );
+				//postProcessing.outputNode = texture(pixelBufferTexture);
+				postProcessing.outputNode = texture(computeShaderTexture);
+
+
+				document.body.appendChild( renderer.domElement );
+
+				stats = new Stats();
+				stats.domElement.style.position = 'absolute';
+				stats.domElement.style.top = '0px';
+				document.body.appendChild( stats.dom );
+
+				const dropArea = renderer.domElement;
+				console.log(dropArea);
 				// Prevent default drag behaviors
 				['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
 					dropArea.addEventListener(eventName, preventDefaults, false);
@@ -260,298 +196,175 @@
 
 				// Handle the drop event
 				dropArea.addEventListener('drop', handleDrop, false);
-			});
+				
+				
 
-			async function handleDrop(e) {
-				const dt = e.dataTransfer;
-				const files = dt.files;
+				controls = new OrbitControls( camera, renderer.domElement );
+				controls.minDistance = 1.0;
+				controls.maxDistance = 20;
+				controls.target.set( 0, 0, 0 );
+				controls.update();
 
-				if (files.length !== 1 || !files[0].name.endsWith('.zip')) {
-					alert("Please drop exactly one .zip file.");
-					return;
-				}
+				
+				window.addEventListener('resize', onWindowResize);
 
-				const zipFile = files[0];
-				const zip = new JSZip();
+				const gui = new GUI();
 
-				try {
-					const content = await zip.loadAsync(zipFile);
-					let jsonData = null;
-					const binDataDict = {};
+				// Load a model by default
+				fetch("./web_model.zip")
+					.then(response => response.arrayBuffer())
+					.then(data => loadZip(data));
 
-					const jsonFile = content.file("options.json");
-					if (jsonFile) {
-						const jsonText = await jsonFile.async("string");
-						jsonData = JSON.parse(jsonText);
-						console.log(jsonData);
+				gui.add(volumeBox.scale, 'x', .01, 100, 0.01 ).name( 'volumeWidth' )
+				gui.add(volumeBox.scale, 'y', .01, 100, 0.01 ).name( 'volumeHeight' )
+				gui.add(volumeBox.scale, 'z', .01, 100, 0.01 ).name( 'volumeDepth' );
+				//	.onChange(( v ) => volumeDepth.value = v );
+
+				async function handleDrop(e) {
+					const dt = e.dataTransfer;
+					const files = dt.files;
+
+					if (files.length !== 1 || !files[0].name.endsWith('.zip')) {
+						alert("Please drop exactly one .zip file.");
+						return;
 					}
 
-					const binFiles = Object.keys(content.files).filter(name => name.endsWith('.bin'));
-					for (const binFileName of binFiles) {
-						const binFile = content.file(binFileName);
-						const binArrayBuffer = await binFile.async("arraybuffer");
-						const floatArray = new Float32Array(binArrayBuffer);
-						binDataDict[binFileName] = floatArray;
-						console.log(`${binFileName}: ${floatArray.length} floats\n`);
-					}
-
-					setupShaderMaterial(jsonData, binDataDict);
-
-				} catch (err) {
-					console.error("Error reading ZIP file:", err);
+					const zipFile = files[0];
+					loadZip(zipFile);
 				}
-			}
-			
-			function generateRandom3DTexture(size) {
-				const data = new Float32Array(size * size * size);
-				for (let i = 0; i < size * size * size; i++) {
-					data[i] = Math.random();
-				}
+				
+				async function loadZip(zipFile){
+					const zip = new JSZip();
 
-				const texture = new THREE.Data3DTexture(data, size, size, size);
-				texture.format = THREE.RedFormat;
-				texture.type = THREE.FloatType;
-				texture.minFilter = THREE.LinearFilter;
-				texture.magFilter = THREE.LinearFilter;
-				texture.unpackAlignment = 1;
-				texture.needsUpdate = true;  // Ensures the texture is updated
-				return texture;
-			}
+					try {
+						const content = await zip.loadAsync(zipFile);
+						let jsonData = null;
+						const binDataDict = {};
 
-			async function setupShaderMaterial(jsonData, binDataDict) {
-				console.log("Updating shader uniforms");
-				//materialSecondPass.uniforms.steps.value = guiControls.steps;
-				//materialSecondPass.uniforms.alphaCorrection.value = guiControls.alphaCorrection;
-				materialSecondPass.uniforms.cubeTex = generateRandom3DTexture(32);
-				console.log(materialSecondPass.uniforms.cubeTex);
-				materialSecondPass.needsUpdate = true;
-			}
-			
-			function init() {
+						const jsonFile = content.file("options.json");
+						if (jsonFile) {
+							const jsonText = await jsonFile.async("string");
+							jsonData = JSON.parse(jsonText);
+							console.log(jsonData);
+						}
 
-				//Parameters that can be modified.
-				guiControls = new function() {
-					this.model = 'bonsai';
-					this.steps = 256.0;
-					this.alphaCorrection = 1.0;
-					this.color1 = "#00FA58";
-					this.stepPos1 = 0.1;
-					this.color2 = "#CC6600";
-					this.stepPos2 = 0.7;
-					this.color3 = "#F2F200";
-					this.stepPos3 = 1.0;
-				};
+						const binFiles = Object.keys(content.files).filter(name => name.endsWith('.bin'));
+						for (const binFileName of binFiles) {
+							const binFile = content.file(binFileName);
+							const binArrayBuffer = await binFile.async("arraybuffer");
+							const floatArray = new Float32Array(binArrayBuffer);
+							binDataDict[binFileName] = floatArray;
+							console.log(`${binFileName}: ${floatArray.length} floats\n`);
+						}
+						setupShaderMaterial(jsonData, binDataDict);
 
-				container = document.getElementById( 'renderer-container' );
-
-				camera = new THREE.PerspectiveCamera( 40, window.innerWidth / window.innerHeight, 0.01, 3000.0 );
-				camera.position.z = 2.0;
-
-				controls = new THREE.OrbitControls( camera, container );
-				controls.target.set( 0.0, 0.0, 0.0 );
-
-
-				//Load the 2D texture containing the Z slices.
-				cubeTextures["bonsai"] = new THREE.TextureLoader().load("bonsai.raw.png");
-				console.log(cubeTextures["bonsai"]);
-				cubeTextures["teapot"] = new THREE.TextureLoader().load("teapot.raw.png");
-				cubeTextures["foot"] = new THREE.TextureLoader().load("foot.raw.png");
-
-				//Don't let it generate mipmaps to save memory and apply linear filtering to prevent use of LOD.
-				cubeTextures['bonsai'].generateMipmaps = false;
-				cubeTextures['bonsai'].minFilter = THREE.LinearFilter;
-				cubeTextures['bonsai'].magFilter = THREE.LinearFilter;
-
-				cubeTextures['teapot'].generateMipmaps = false;
-				cubeTextures['teapot'].minFilter = THREE.LinearFilter;
-				cubeTextures['teapot'].magFilter = THREE.LinearFilter;
-
-				cubeTextures['foot'].generateMipmaps = false;
-				cubeTextures['foot'].minFilter = THREE.LinearFilter;
-				cubeTextures['foot'].magFilter = THREE.LinearFilter;
-
-
-				var transferTexture = updateTransferFunction();
-
-				var screenSize = new THREE.Vector2( window.innerWidth, window.innerHeight );
-				//Use NearestFilter to eliminate interpolation.  At the cube edges, interpolated world coordinates
-				//will produce bogus ray directions in the fragment shader, and thus extraneous colors.
-				rtTexture = new THREE.WebGLRenderTarget(screenSize.x, screenSize.y, {
-					minFilter: THREE.NearestFilter,
-					magFilter: THREE.NearestFilter,
-					wrapS: THREE.ClampToEdgeWrapping,
-					wrapT: THREE.ClampToEdgeWrapping,
-					format: THREE.RGBAFormat,
-					type: THREE.FloatType,
-					generateMipmaps: false,
-					stencilBuffer: true,
-				});
-
-				// Normalized sizes of the cube's dimensions.
-				// Format: [x, y, z] or [width, height, depth]
-				// If the input data "cube" has dimensions 50 x 25 x 100, then boxSize should be [0.5, 0.25, 1.0]
-				// Hardcoding to [1 ,1, 1] here because all input dataets are cubes. 
-				const boxSize = [1, 1, 1]
-
-				var materialFirstPass = new THREE.ShaderMaterial( {
-					vertexShader: document.getElementById( 'vertexShaderFirstPass' ).textContent,
-					fragmentShader: document.getElementById( 'fragmentShaderFirstPass' ).textContent,
-					side: THREE.BackSide,
-					uniforms: {
-                        boxWidth: {
-                            type: '1f',
-                            value: boxSize[0],
-                        },
-                        boxHeight: {
-                            type: '1f',
-                            value: boxSize[1],
-                        },
-                        boxDepth: {
-                            type: '1f',
-                            value: boxSize[2],
-                        },
-                    },
-				} );
-
-				materialSecondPass = new THREE.ShaderMaterial( {
-					vertexShader: document.getElementById( 'vertexShaderSecondPass' ).textContent,
-					fragmentShader: document.getElementById( 'fragmentShaderSecondPass' ).textContent,
-					side: THREE.FrontSide,
-					uniforms: {	tex:  { type: "t", value: rtTexture.texture },
-								cubeTex:  { type: "t", value: cubeTextures['bonsai'] },
-								volumeTexture: {type: "t", value: generateRandom3DTexture(32) },
-								transferTex:  { type: "t", value: transferTexture },
-								steps : {type: "1f" , value: guiControls.steps },
-								alphaCorrection : {type: "1f", value: guiControls.alphaCorrection },
-								boxWidth: {type: '1f', value: boxSize[0] },
-								boxHeight: {type: '1f', value: boxSize[1] },
-								boxDepth: {type: '1f', value: boxSize[2] }
+					} catch (err) {
+						console.error("Error reading ZIP file:", err);
 					}
-				} );
-				materialSecondPass.needsUpdate = true;
+				}
+				
+				async function setupShaderMaterial(jsonData, binDataDict) {
+					console.log("getting model data");
+					const num_grids = jsonData['n_grids'];
 
-				sceneFirstPass = new THREE.Scene();
-				sceneSecondPass = new THREE.Scene();
+					// update the transformation matrices
+					let transformation_matrices = new Float32Array(16*256).fill(0);
+					for(let i = 0; i < num_grids; i++){
+						const o = 16*i;
+						let q = binDataDict['_rotations.bin'].slice(4*i,4*(i+1));
+						let s = binDataDict['_scales.bin'].slice(3*i,3*(i+1));
+						let t = binDataDict['translations.bin'].slice(3*i,3*(i+1));
+						for (let j = 0; j < s.length; j++){
+							s[j] = Math.exp(s[j]);
+						}
+						const magnitude = Math.sqrt(q[0] * q[0] + q[1] * q[1] + q[2] * q[2] + q[3] * q[3]);
+						if (magnitude > 0.0) {
+							const invMagnitude = 1.0 / magnitude;
+							q[0] *= invMagnitude;
+							q[1] *= invMagnitude;
+							q[2] *= invMagnitude;
+							q[3] *= invMagnitude;
+						}
+						const wx = q[0] * q[3];
+						const wy = q[1] * q[3];
+						const wz = q[2] * q[3];
+						const xx = q[0] * q[0];
+						const xy = q[0] * q[1];
+						const xz = q[0] * q[2];
+						const yy = q[1] * q[1];
+						const yz = q[1] * q[2];
+						const zz = q[2] * q[2];
 
-				var boxGeometry = new THREE.BoxGeometry(1.0, 1.0, 1.0);
-				boxGeometry.doubleSided = true;
+						transformation_matrices[o + 0] = s[0] * (1.0 - 2.0 * (yy + zz));
+						transformation_matrices[o + 1] = s[1] * (2.0 * (xy - wz));
+						transformation_matrices[o + 2] = s[2] * (2.0 * (xz + wy));
+						transformation_matrices[o + 3] = t[0];
 
-				var meshFirstPass = new THREE.Mesh( boxGeometry, materialFirstPass );
-				var meshSecondPass = new THREE.Mesh( boxGeometry, materialSecondPass );
+						transformation_matrices[o + 4] = s[0] * (2.0 * (xy + wz));
+						transformation_matrices[o + 5] = s[1] * (1.0 - 2.0 * (xx + zz));
+						transformation_matrices[o + 6] = s[2] * (2.0 * (yz - wx));    
+						transformation_matrices[o + 7] = t[1];
 
-				sceneFirstPass.add( meshFirstPass );
-				sceneSecondPass.add( meshSecondPass );
+						transformation_matrices[o + 8] = s[0] * (2.0 * (xz - wy));
+						transformation_matrices[o + 9] = s[1] * (2.0 * (yz + wx));
+						transformation_matrices[o + 10] = s[2] * (1.0 - 2.0 * (xx + yy));
+						transformation_matrices[o + 11] = t[2];
 
-				renderer = new THREE.WebGLRenderer();
-				container.appendChild( renderer.domElement );
-
-				stats = new Stats();
-				stats.domElement.style.position = 'absolute';
-				stats.domElement.style.top = '0px';
-				container.appendChild( stats.domElement );
-
-
-				var gui = new dat.GUI();
-				var modelSelected = gui.add(guiControls, 'model', [ 'bonsai', 'foot', 'teapot' ] );
-				gui.add(guiControls, 'steps', 0.0, 512.0);
-				gui.add(guiControls, 'alphaCorrection', 0.01, 5.0).step(0.01);
-
-				modelSelected.onChange(function(value) { materialSecondPass.uniforms.cubeTex.value =  cubeTextures[value]; } );
-
-
-				//Setup transfer function steps.
-				var step1Folder = gui.addFolder('Step 1');
-				var controllerColor1 = step1Folder.addColor(guiControls, 'color1');
-				var controllerStepPos1 = step1Folder.add(guiControls, 'stepPos1', 0.0, 1.0);
-				controllerColor1.onChange(updateTextures);
-				controllerStepPos1.onChange(updateTextures);
-
-				var step2Folder = gui.addFolder('Step 2');
-				var controllerColor2 = step2Folder.addColor(guiControls, 'color2');
-				var controllerStepPos2 = step2Folder.add(guiControls, 'stepPos2', 0.0, 1.0);
-				controllerColor2.onChange(updateTextures);
-				controllerStepPos2.onChange(updateTextures);
-
-				var step3Folder = gui.addFolder('Step 3');
-				var controllerColor3 = step3Folder.addColor(guiControls, 'color3');
-				var controllerStepPos3 = step3Folder.add(guiControls, 'stepPos3', 0.0, 1.0);
-				controllerColor3.onChange(updateTextures);
-				controllerStepPos3.onChange(updateTextures);
-
-				step1Folder.open();
-				step2Folder.open();
-				step3Folder.open();
-
-
-				onWindowResize();
-
-				window.addEventListener( 'resize', onWindowResize, false );
+						transformation_matrices[o + 12] = t[0];
+						transformation_matrices[o + 13] = t[1];
+						transformation_matrices[o + 14] = t[2];
+						transformation_matrices[o + 15] = 1.0;
+					}					
+					// update the texture for mlp weights
+					let mlp_array = binDataDict['decoder.0.linear.weight.bin'];
+					for(let i = 1; i < jsonData['n_layers']; i++){
+						mlp_array = [...mlp_array, ...binDataDict['decoder.'+i+'.linear.weight.bin']];
+					}
+					mlp_array = [...mlp_array, ...binDataDict['decoder.'+jsonData['n_layers']+'.weight.bin']];
+					
+					modelLoaded.value = 1;
+				}
+				
 
 			}
 
-			function updateTextures(value)
-			{
-				materialSecondPass.uniforms.transferTex.value = updateTransferFunction();
-			}
-			
-			function updateTransferFunction()
-			{
-				var canvas = document.createElement('canvas');
-				canvas.height = 20;
-				canvas.width = 256;
+			function onWindowResize() {
 
-				var ctx = canvas.getContext('2d');
+				const { innerWidth, innerHeight } = window;
 
-				var grd = ctx.createLinearGradient(0, 0, canvas.width -1 , canvas.height - 1);
-				grd.addColorStop(guiControls.stepPos1, guiControls.color1);
-				grd.addColorStop(guiControls.stepPos2, guiControls.color2);
-				grd.addColorStop(guiControls.stepPos3, guiControls.color3);
-
-				ctx.fillStyle = grd;
-				ctx.fillRect(0,0,canvas.width -1 ,canvas.height -1 );
-
-				var img = document.getElementById("transferFunctionImg");
-				img.src = canvas.toDataURL();
-				img.style.width = "256 px";
-				img.style.height = "128 px";
-
-				transferTexture =  new THREE.Texture(canvas);
-				transferTexture.wrapS = transferTexture.wrapT =  THREE.ClampToEdgeWrapping;
-				transferTexture.needsUpdate = true;
-
-				return transferTexture;
-			}
-
-			function onWindowResize( event ) {
-
-				camera.aspect = window.innerWidth / window.innerHeight;
+				camera.aspect = innerWidth / innerHeight;
 				camera.updateProjectionMatrix();
+				const dpr = renderer.getPixelRatio();
+				renderTarget.setSize( window.innerWidth * dpr, window.innerHeight * dpr );
 
-				renderer.setSize( window.innerWidth, window.innerHeight );
+				renderer.setSize( innerWidth, innerHeight );
+
 			}
 
-			function animate() {
-
-				requestAnimationFrame( animate );
-
-				render();
+			async function animate() {
 				stats.update();
-			}
-
-			function render() {
-
-				var delta = clock.getDelta();
-
-				//Render first pass and store the world space coords of the back face fragments into the texture.
-				renderer.setRenderTarget(rtTexture);
-				renderer.render(sceneFirstPass, camera);
+				renderer.setRenderTarget(renderTarget);
+				await renderer.renderAsync(scene, camera);
+				await renderer.computeAsync(compute_computeShader);
 				renderer.setRenderTarget(null);
+				await postProcessing.renderAsync();
 
-				//Render the second pass and perform the volume rendering.
-				renderer.render(sceneSecondPass, camera);
+				// throttle the logging
 
-				materialSecondPass.uniforms.steps.value = guiControls.steps;
-				materialSecondPass.uniforms.alphaCorrection.value = guiControls.alphaCorrection;
+				if ( renderer.hasFeature( 'timestamp-query' ) ) {
+
+					if ( renderer.info.render.calls % 5 === 0 ) {
+						timestamps.innerHTML = 'Timestamp queries not supported';
+						
+					}
+
+				} else {
+
+					timestamps.innerHTML = 'Timestamp queries not supported';
+
+				}
+
+
 			}
 
 		</script>
