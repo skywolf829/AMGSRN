@@ -1,10 +1,10 @@
 [
     [ "train.py",
         {        
-            "save_name": "supernova_medium_new",
+            "save_name": "supernova_large_new",
             "model": "AMGSRN",
             "data": "supernova1327.h5",
-            "n_features": 1,
+            "n_features": 2,
             "n_grids": 32,
             "feature_grid_shape": "32,32,32",
             "n_layers": 2,
@@ -17,10 +17,10 @@
     }],
     [ "train.py",
         {        
-            "save_name": "supernova_medium_old",
+            "save_name": "supernova_large_old",
             "model": "AMGSRN_old",
             "data": "supernova1327.h5",
-            "n_features": 1,
+            "n_features": 2,
             "n_grids": 32,
             "feature_grid_shape": "32,32,32",
             "n_layers": 2,

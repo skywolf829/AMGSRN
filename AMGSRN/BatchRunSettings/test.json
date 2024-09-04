@@ -1,12 +1,12 @@
 [    
     [ "test.py",
         {        
-        "load_from": "supernova_medium_new",
+        "load_from": "supernova_large_new",
         "tests": "psnr"
     }],
     [ "test.py",
         {        
-        "load_from": "supernova_medium_old",
+        "load_from": "supernova_large_old",
         "tests": "psnr"
     }]
 ]

@@ -126,6 +126,20 @@ def build_commands(settings_path):
                             create_path(os.path.join(save_folder, variables["load_from"]))
                         run_number += 1
 
+        elif("train" in script_name and "time_varying" in variables.keys() and \
+            variables['time_varying']):
+            print(f"Time-varying model being trained - creating jobs")
+
+            base_opt = Options.get_default()
+            for var_name in variables.keys():
+                base_opt[var_name] = variables[var_name]
+            
+            create_path(os.path.join(save_folder, base_opt['save_name']))
+            save_options(base_opt, os.path.join(save_folder, base_opt['save_name']))
+
+            # list the files (time-varying) we need to train
+        
+
         else:
             
             run_name = str(run_number)

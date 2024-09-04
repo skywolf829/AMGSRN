@@ -31,53 +31,43 @@ __device__ void trilinearInterpolate(
     float y = (H-1) * ((point.y+1.f)/2.f);
     float z = (D-1) * ((point.z+1.f)/2.f);
     
-    // 0 if truly out of bounds including zero padding
-    if(x <= -1 || y <= -1 || z <= -1 || x >= W || y >= H || z >= D){
-        for(int i = 0; i<C;++i) output[i] = 0.f;
-        return;
-    }
-    int x0 = floor(x);
+    int x0 = __float2int_rd(x);
+    int y0 = __float2int_rd(y);
+    int z0 = __float2int_rd(z);
     int x1 = x0 + 1;
-    int y0 = floor(y);
     int y1 = y0 + 1;
-    int z0 = floor(z);
     int z1 = z0 + 1;
 
     float xd = x - x0;
     float yd = y - y0;
     float zd = z - z0;
 
-    bool x0_in = (x0 != -1);
-    bool x1_in = (x1 != W);
-    bool y0_in = (y0 != -1);
-    bool y1_in = (y1 != H);
-    bool z0_in = (z0 != -1);
-    bool z1_in = (z1 != D);
+    // Pre-compute weights
+    float w000 = (1-xd)*(1-yd)*(1-zd);
+    float w001 = xd*(1-yd)*(1-zd);
+    float w010 = (1-xd)*yd*(1-zd);
+    float w011 = xd*yd*(1-zd);
+    float w100 = (1-xd)*(1-yd)*zd;
+    float w101 = xd*(1-yd)*zd;
+    float w110 = (1-xd)*yd*zd;
+    float w111 = xd*yd*zd;
 
     // Iterate over each channel
-    for(int i = 0; i < C; ++i){
-        // Fetch the 8 grid values at corner points
-        auto g = i*D*H*W;
-        float c000 = z0_in && y0_in && x0_in ? grid[g + z0 * H * W + y0 * W + x0] : 0;
-        float c001 = z0_in && y0_in && x1_in ? grid[g + z0 * H * W + y0 * W + x1] : 0;
-        float c010 = z0_in && y1_in && x0_in ? grid[g + z0 * H * W + y1 * W + x0] : 0;
-        float c011 = z0_in && y1_in && x1_in ? grid[g + z0 * H * W + y1 * W + x1] : 0;
-        float c100 = z1_in && y0_in && x0_in ? grid[g + z1 * H * W + y0 * W + x0] : 0;
-        float c101 = z1_in && y0_in && x1_in ? grid[g + z1 * H * W + y0 * W + x1] : 0;
-        float c110 = z1_in && y1_in && x0_in ? grid[g + z1 * H * W + y1 * W + x0] : 0;
-        float c111 = z1_in && y1_in && x1_in ? grid[g + z1 * H * W + y1 * W + x1] : 0;
+    for(int i = 0; i < C; ++i) {
+        float result = 0.f;
+        int base_idx = i*D*H*W;
 
-        // Interpolate
-        float c00 = c000 * (1 - xd) + c001 * xd;
-        float c01 = c010 * (1 - xd) + c011 * xd;
-        float c10 = c100 * (1 - xd) + c101 * xd;
-        float c11 = c110 * (1 - xd) + c111 * xd;
+        // Use ternary operators to avoid branching
+        result += (z0 >= 0 && y0 >= 0 && x0 >= 0) ? grid[base_idx + z0*H*W + y0*W + x0] * w000 : 0.f;
+        result += (z0 >= 0 && y0 >= 0 && x1 < W) ? grid[base_idx + z0*H*W + y0*W + x1] * w001 : 0.f;
+        result += (z0 >= 0 && y1 < H && x0 >= 0) ? grid[base_idx + z0*H*W + y1*W + x0] * w010 : 0.f;
+        result += (z0 >= 0 && y1 < H && x1 < W) ? grid[base_idx + z0*H*W + y1*W + x1] * w011 : 0.f;
+        result += (z1 < D && y0 >= 0 && x0 >= 0) ? grid[base_idx + z1*H*W + y0*W + x0] * w100 : 0.f;
+        result += (z1 < D && y0 >= 0 && x1 < W) ? grid[base_idx + z1*H*W + y0*W + x1] * w101 : 0.f;
+        result += (z1 < D && y1 < H && x0 >= 0) ? grid[base_idx + z1*H*W + y1*W + x0] * w110 : 0.f;
+        result += (z1 < D && y1 < H && x1 < W) ? grid[base_idx + z1*H*W + y1*W + x1] * w111 : 0.f;
 
-        float c0 = c00 * (1 - yd) + c01 * yd;
-        float c1 = c10 * (1 - yd) + c11 * yd;
-
-        float c = c0 * (1 - zd) + c1 * zd;
-        output[i] = c;
+        output[i] = result;
     }
 }
 
@@ -148,21 +138,41 @@ __global__ void encodeForwardKernel(
     float*__restrict__ output_features) {
 
 
+    __shared__ float s_rotation_matrices[9];
+    __shared__ float s_translations[3];
+
     auto idx = blockIdx.x * blockDim.x + threadIdx.x;
     if (idx >= num_points) return;
 
-    // Grab the query point into local registers
+    // Load the query point into local registers
     float3 point = make_float3(query_points[3 * idx],
                     query_points[3 * idx + 1], 
                     query_points[3 * idx + 2]);
 
-    // Transform the point into local space for the grid using pre-computed rotation matrix
+    // Transform the point into local space for each grid
     for(auto grid_idx = 0; grid_idx < num_grids; grid_idx++){
-        float3 point_t = transformPoint(&rotation_matrices[9*grid_idx], &translations[3*grid_idx], point);
-        // Perform feature grid trilinear interpolation and write the result directly to the output
-        trilinearInterpolate(&feature_grids[grid_idx*features_per_grid*D*H*W], 
-            features_per_grid, D, H, W, point_t, 
-            &output_features[idx*num_grids*features_per_grid + features_per_grid*grid_idx]);
+        // Cooperatively load rotation matrix and translation into shared memory
+        if (threadIdx.x < 9) {
+            s_rotation_matrices[threadIdx.x] = rotation_matrices[9*grid_idx + threadIdx.x];
+        }
+        if (threadIdx.x < 3) {
+            s_translations[threadIdx.x] = translations[3*grid_idx + threadIdx.x];
+        }
+        __syncthreads();
+
+        float3 point_t = transformPoint(s_rotation_matrices, s_translations, point);
+        
+        // Check if the point is in the grid
+        if(point_t.x >= -1 && point_t.y >= -1 && point_t.z >= -1 && point_t.x < W && point_t.y < H && point_t.z < D){
+            trilinearInterpolate(&feature_grids[grid_idx*features_per_grid*D*H*W], 
+                features_per_grid, D, H, W, point_t, 
+                &output_features[idx*num_grids*features_per_grid + features_per_grid*grid_idx]);
+        }
+        // If the point is out of bounds, set the output for each channel to 0
+        else{
+            for(int i = 0; i<features_per_grid;++i) 
+                output_features[idx*num_grids*features_per_grid + features_per_grid*grid_idx + i] = 0.f;
+        }
     }
 }
 
@@ -180,6 +190,9 @@ __global__ void encodeBackwardKernel(
     const float* dL_dFeatureVectors, 
     float* dL_dFeatureGrids) {
     
+    __shared__ float s_rotation_matrices[9];
+    __shared__ float s_translations[3];
+
     auto idx = blockIdx.x * blockDim.x + threadIdx.x;
     if (idx >= num_points) return;
 
@@ -187,9 +200,16 @@ __global__ void encodeBackwardKernel(
     float3 point = make_float3(query_points[3 * idx],query_points[3 * idx + 1], query_points[3 * idx + 2]);
 
     for(auto grid_idx = 0; grid_idx < num_grids; ++grid_idx){
+        if (threadIdx.x < 9) {
+            s_rotation_matrices[threadIdx.x] = rotation_matrices[9*grid_idx + threadIdx.x];
+        }
+        if (threadIdx.x < 3) {
+            s_translations[threadIdx.x] = translations[3*grid_idx + threadIdx.x];
+        }
+        __syncthreads();
+
         // Transform the point into local space for the grid using pre-computed rotation matrix
-        float3 point_t = transformPoint(&rotation_matrices[9*grid_idx], &translations[3*grid_idx], point);
-        // Perform feature grid trilinear interpolation and write the result directly to the output
+        float3 point_t = transformPoint(s_rotation_matrices, s_translations, point);
         trilinearInterpolateBackwards(&dL_dFeatureGrids[grid_idx*features_per_grid*D*H*W], 
             features_per_grid, D, H, W, point_t, 
             &dL_dFeatureVectors[idx*num_grids*features_per_grid + features_per_grid*grid_idx]
@@ -235,7 +255,7 @@ __global__ void densityForwardKernel(
         float det = R[o+0] * (R[o+4]*R[o+8]-R[o+5]*R[o+7]) -
                    R[o+1] * (R[o+3]*R[o+8]-R[o+5]*R[o+6]) +
                    R[o+2] * (R[o+3]*R[o+7]-R[o+4]*R[o+6]); 
-        float g = expf(-(powf(point_t.x, 20) + powf(point_t.y, 20) + powf(point_t.z, 20)));
+        float g = __expf(-(powf(point_t.x, 20) + powf(point_t.y, 20) + powf(point_t.z, 20)));
         density += det * g;
     }
     output_density[idx] = density;
@@ -300,7 +320,7 @@ __global__ void densityBackwardKernel(
             float ty19 = powf(point_t.y, 19);
             float tz19 = powf(point_t.z, 19); 
 
-            float g = expf(-(powf(point_t.x, 20) + powf(point_t.y, 20) + powf(point_t.z, 20)));
+            float g = __expf(-(powf(point_t.x, 20) + powf(point_t.y, 20) + powf(point_t.z, 20)));
             float det20g = -20.f * det * g;
 
             //0-8 is rotation matrix grads, 9-12 is translation
@@ -480,12 +500,10 @@ __global__ void quaternionScaleToRotationMatrix(
     if (idx >= numTransforms) return;
     auto o = idx*9;
 
-    float4 q;
-    float s[3];
-
-    // Load the quaternion, scale, and translation for this thread
-    q = quaternions[idx];
-    for (int i = 0; i < 3; ++i) s[i] = scales[idx * 3 + i];
+    float4 q = quaternions[idx];
+    float sx = scales[idx * 3];
+    float sy = scales[idx * 3 + 1];
+    float sz = scales[idx * 3 + 2];
 
     float wx = q.x * q.w;
     float wy = q.y * q.w;
@@ -499,17 +517,17 @@ __global__ void quaternionScaleToRotationMatrix(
     float yz = q.y * q.z;
     float zz = q.z * q.z;
 
-    output[o + 0] = s[0] * (1.f - 2.f * (yy + zz));
-    output[o + 1] = s[1] * (2.f * (xy - wz));
-    output[o + 2] = s[2] * (2.f * (xz + wy));
+    output[o + 0] = sx * (1.f - 2.f * (yy + zz));
+    output[o + 1] = sy * (2.f * (xy - wz));
+    output[o + 2] = sz * (2.f * (xz + wy));
 
-    output[o + 3] = s[0] * (2.f * (xy + wz));
-    output[o + 4] = s[1] * (1.f - 2.f * (xx + zz));
-    output[o + 5] = s[2] * (2.f * (yz - wx));    
+    output[o + 3] = sx * (2.f * (xy + wz));
+    output[o + 4] = sy * (1.f - 2.f * (xx + zz));
+    output[o + 5] = sz * (2.f * (yz - wx));    
 
-    output[o + 6] = s[0] * (2.f * (xz - wy));
-    output[o + 7] = s[1] * (2.f * (yz + wx));
-    output[o + 8] = s[2] * (1.f - 2.f * (xx + yy));
+    output[o + 6] = sx * (2.f * (xz - wy));
+    output[o + 7] = sy * (2.f * (yz + wx));
+    output[o + 8] = sz * (1.f - 2.f * (xx + yy));
 }
 
 
@@ -525,11 +543,10 @@ __global__ void rotationMatrixBackward(
     if (idx >= numTransforms) return;
     auto o = idx * 9;
 
-    float4 q;
-    float s[3];
-
-    q = quaternions[idx];
-    for (int i = 0; i < 3; ++i) s[i] = scales[idx * 3 + i];
+    float4 q = quaternions[idx];;
+    float sx = scales[idx * 3];
+    float sy = scales[idx * 3 + 1];
+    float sz = scales[idx * 3 + 2];
 
     float wx = q.x * q.w;
     float wy = q.y * q.w;
@@ -554,21 +571,21 @@ __global__ void rotationMatrixBackward(
         (dMatrix[o + 5]*(2 * (yz - wx)))+
         (dMatrix[o + 8]*(1 - 2 * (xx + yy)));    
 
-    dQuaternions[idx].x =   -4 * q.x * (dMatrix[o + 4] * s[1] + dMatrix[o + 8] * s[2]) +
-                            2 * q.y * (dMatrix[o + 1] * s[1] + dMatrix[o + 3] * s[0]) +
-                            2 * q.z * (dMatrix[o + 2] * s[2] + dMatrix[o + 6] * s[0]) + 
-                            2 * q.w * (dMatrix[o + 5] * -s[2] + dMatrix[o + 7] * s[1]);
-    dQuaternions[idx].y =   2 * q.x * (dMatrix[o + 1] * s[1] + dMatrix[o + 3] * s[0]) +
-                            -4 * q.y * (dMatrix[o + 0] * s[0] + dMatrix[o + 8] * s[2]) +
-                            2 * q.z * (dMatrix[o + 5] * s[2] + dMatrix[o + 7] * s[1]) + 
-                            2 * q.w * (dMatrix[o + 2] * s[2] + dMatrix[o + 6] * -s[0]);
-    dQuaternions[idx].z =   2 * q.x * (dMatrix[o + 2] * s[2] + dMatrix[o + 6] * s[0]) +
-                            2 * q.y * (dMatrix[o + 5] * s[2] + dMatrix[o + 7] * s[1]) +
-                            -4 * q.z * (dMatrix[o + 0] * s[0] + dMatrix[o + 4] * s[1]) + 
-                            2 * q.w * (dMatrix[o + 1] * -s[1] + dMatrix[o + 3] * s[0]);
-    dQuaternions[idx].w =   2 * q.x * (dMatrix[o + 5] * -s[2] + dMatrix[o + 7] * s[1]) +
-                            2 * q.y * (dMatrix[o + 2] * s[2] + dMatrix[o + 6] * -s[0]) +
-                            2 * q.z * (dMatrix[o + 1] * -s[1] + dMatrix[o + 3] * s[0]); 
+    dQuaternions[idx].x =   -4 * q.x * (dMatrix[o + 4] * sx + dMatrix[o + 8] * sz) +
+                            2 * q.y * (dMatrix[o + 1] * sy + dMatrix[o + 3] * sx) +
+                            2 * q.z * (dMatrix[o + 2] * sz + dMatrix[o + 6] * sx) + 
+                            2 * q.w * (dMatrix[o + 5] * -sz + dMatrix[o + 7] * sy);
+    dQuaternions[idx].y =   2 * q.x * (dMatrix[o + 1] * sy + dMatrix[o + 3] * sx) +
+                            -4 * q.y * (dMatrix[o + 0] * sx + dMatrix[o + 8] * sz) +
+                            2 * q.z * (dMatrix[o + 5] * sz + dMatrix[o + 7] * sy) + 
+                            2 * q.w * (dMatrix[o + 2] * sz + dMatrix[o + 6] * -sx);
+    dQuaternions[idx].z =   2 * q.x * (dMatrix[o + 2] * sz + dMatrix[o + 6] * sx) +
+                            2 * q.y * (dMatrix[o + 5] * sz + dMatrix[o + 7] * sy) +
+                            -4 * q.z * (dMatrix[o + 0] * sx + dMatrix[o + 4] * sy) + 
+                            2 * q.w * (dMatrix[o + 1] * -sy + dMatrix[o + 3] * sx);
+    dQuaternions[idx].w =   2 * q.x * (dMatrix[o + 5] * -sz + dMatrix[o + 7] * sy) +
+                            2 * q.y * (dMatrix[o + 2] * sz + dMatrix[o + 6] * -sx) +
+                            2 * q.z * (dMatrix[o + 1] * -sy + dMatrix[o + 3] * sx); 
 
 }
 
