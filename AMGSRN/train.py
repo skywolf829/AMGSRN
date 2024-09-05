@@ -151,28 +151,6 @@ def log_feature_grids_from_points(opt):
             vtm.SetBlock(j, vts)
         write_vtm(os.path.join(vtm_dir, f"grids_{i:03}.vtm", ), vtm)
 
-def train_step_APMGSRN_precondition(opt, iteration, batch, dataset, model, optimizer, scheduler, profiler, writer):
-    opt['iteration_number'] = iteration
-    optimizer.zero_grad() 
-                 
-    x, y = batch
-    x = x.to(opt['device'])
-    y = y.to(opt['device'])
-        
-    model_output = model(x)
-    loss = F.mse_loss(model_output, y, reduction='none')
-    loss = loss.sum(dim=1, keepdim=True)
-    loss.mean().backward()
-
-    optimizer.step()
-    scheduler.step()        
-    profiler.step()
-    
-    if(opt['log_every'] != 0):
-        logging(writer, iteration, 
-            {"Fitting loss": loss}, 
-            model, opt, dataset.data.shape[2:], dataset)
-
 def train_step_APMGSRN(opt, iteration, batch, dataset, model, optimizer, scheduler, writer, 
                       early_stopping_data=None):
     early_stop_reconstruction = early_stopping_data[0]
@@ -351,6 +329,14 @@ def train( model, dataset, opt):
     if(opt['log_every'] > 0):
         writer.close()
     save_model(model, opt)
+
+def train_timevarying(model, dataset, opt):
+    for t in range(dataset.n_timesteps):
+        model.set_default_timestep(t)
+        model.prepare_timestep(t)
+        dataset.set_default_timestep(t)
+        dataset.load_timestep(t)
+        train(model, dataset, opt)
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Trains an implicit model on data.')

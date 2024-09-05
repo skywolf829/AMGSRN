@@ -22,7 +22,6 @@ class Options():
         
         opt['data']                                 = 'tornado.nc'
         opt['time_varying']                         = False    
-        opt['timestep']                             = 0
         opt['grid_initialization']                  = "default"
         opt['ensemble']                             = False
         opt['ensemble_grid']                        = "1,1,1"

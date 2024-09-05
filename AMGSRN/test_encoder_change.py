@@ -38,7 +38,7 @@ def forward_encode_test():
     feature_grids, translations, scales, rotations = randomize_grids(32, 2, [64, 64, 64], 3)
 
     torch.cuda.reset_peak_memory_stats()
-    x = torch.rand([2**20, 3], dtype=torch.float32, device="cuda")
+    x = torch.rand([2**21, 3], dtype=torch.float32, device="cuda")
     s = torch.exp(scales)
     r = torch.nn.functional.normalize(rotations)
     encode(x, r, s, translations, feature_grids)
@@ -181,13 +181,13 @@ def forward_full_test():
     model_new = AMGSRN(opt).to(opt['device'])
     
     torch.cuda.reset_peak_memory_stats()
-    x = torch.rand([2**19, 3], dtype=torch.float32, device="cuda")
+    x = torch.rand([2**21, 3], dtype=torch.float32, device="cuda")
     model_new(x)
     torch.cuda.synchronize()
     t0 = time()
-    for i in range(100):
-        #o = model_new(x)
-        feats = encode(x, model_new._rotations, model_new._scales, model_new.translations, model_new.feature_grids)  
+    for i in range(0):
+        o = model_new(x)
+        #feats = encode(x, model_new.rotations, model_new.scales, model_new.translations, model_new.feature_grids)  
         #y = model_new.decoder(feats)
     torch.cuda.synchronize()
     t1 = time()
@@ -196,15 +196,16 @@ def forward_full_test():
     print(f"New model code took {t1-t0:0.02f}s with {gb:0.02f} GB VRAM")
 
 
-    old_model = AMGSRN_old(opt).to(opt['device'])
+    old_model : AMGSRN_old = AMGSRN_old(opt).to(opt['device'])
     del model_new
     torch.cuda.reset_peak_memory_stats()
-    x = torch.rand([2**19, 3], device="cuda")
     old_model(x)
     torch.cuda.synchronize()
     t0 = time()
-    for i in range(100):
+    for i in range(0):
         o = old_model(x)
+        #feats = old_model.encoder(x)
+        #y = old_model.decoder(feats)
     torch.cuda.synchronize()
     t1 = time()
     gb = torch.cuda.max_memory_allocated(device='cuda')/(1024**3)

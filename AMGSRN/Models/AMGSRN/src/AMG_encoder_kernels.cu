@@ -132,47 +132,46 @@ __global__ void encodeForwardKernel(
     const int H, 
     const int W,
     const float* __restrict__ query_points, 
-    const float *rotation_matrices, 
-    const float *translations,
-    const float *feature_grids, 
-    float*__restrict__ output_features) {
+    const float* __restrict__ rotation_matrices, 
+    const float* __restrict__ translations,
+    const float* __restrict__ feature_grids, 
+    float* __restrict__ output_features) {
 
+    const auto point_idx = blockIdx.x * blockDim.x + threadIdx.x;
+    const int grid_idx = blockIdx.y;
 
-    __shared__ float s_rotation_matrices[9];
-    __shared__ float s_translations[3];
+    if (grid_idx >= num_grids || point_idx >= num_points) return;
 
-    auto idx = blockIdx.x * blockDim.x + threadIdx.x;
-    if (idx >= num_points) return;
+    float* output_ptr = &output_features[point_idx*num_grids*features_per_grid + features_per_grid*grid_idx];
 
     // Load the query point into local registers
-    float3 point = make_float3(query_points[3 * idx],
-                    query_points[3 * idx + 1], 
-                    query_points[3 * idx + 2]);
+    float3 point = make_float3(
+        query_points[point_idx],
+        query_points[num_points + point_idx],
+        query_points[2 * num_points + point_idx]
+    );
 
-    // Transform the point into local space for each grid
-    for(auto grid_idx = 0; grid_idx < num_grids; grid_idx++){
-        // Cooperatively load rotation matrix and translation into shared memory
-        if (threadIdx.x < 9) {
-            s_rotation_matrices[threadIdx.x] = rotation_matrices[9*grid_idx + threadIdx.x];
-        }
-        if (threadIdx.x < 3) {
-            s_translations[threadIdx.x] = translations[3*grid_idx + threadIdx.x];
-        }
-        __syncthreads();
+    // Load rotation matrix and translation directly from global memory
+    float rotation_matrix[9];
+    float translation[3];
+    for (int i = 0; i < 9; ++i) {
+        rotation_matrix[i] = rotation_matrices[9*grid_idx + i];
+    }
+    for (int i = 0; i < 3; ++i) {
+        translation[i] = translations[3*grid_idx + i];
+    }
 
-        float3 point_t = transformPoint(s_rotation_matrices, s_translations, point);
-        
-        // Check if the point is in the grid
-        if(point_t.x >= -1 && point_t.y >= -1 && point_t.z >= -1 && point_t.x < W && point_t.y < H && point_t.z < D){
-            trilinearInterpolate(&feature_grids[grid_idx*features_per_grid*D*H*W], 
-                features_per_grid, D, H, W, point_t, 
-                &output_features[idx*num_grids*features_per_grid + features_per_grid*grid_idx]);
-        }
-        // If the point is out of bounds, set the output for each channel to 0
-        else{
-            for(int i = 0; i<features_per_grid;++i) 
-                output_features[idx*num_grids*features_per_grid + features_per_grid*grid_idx + i] = 0.f;
-        }
+    float3 point_t = transformPoint(rotation_matrix, translation, point);
+    
+    // Check if the point is in the grid
+    if(point_t.x >= -1 && point_t.y >= -1 && point_t.z >= -1 && point_t.x <= 1 && point_t.y <= 1 && point_t.z <= 1){
+        trilinearInterpolate(&feature_grids[grid_idx*features_per_grid*D*H*W], 
+            features_per_grid, D, H, W, point_t, output_ptr);
+    }
+    // If the point is out of bounds, set the output for each channel to 0
+    else{
+        for(int i = 0; i < features_per_grid; ++i) 
+            output_ptr[i] = 0.f;
     }
 }
 
@@ -654,19 +653,12 @@ void launch_encode_forward(
         scales, 
         rotation_matrices
     );
-
-    blocksPerGrid = (num_points + THREADS_PER_BLOCK - 1) / THREADS_PER_BLOCK;
-    // Next, perform interpolation
-    encodeForwardKernel<<<blocksPerGrid, THREADS_PER_BLOCK>>>(
-        num_points, 
-        num_grids, 
-        features_per_grid,
-        D, H, W,
-        query_points, 
-        rotation_matrices, 
-        translations,
-        feature_grids, 
-        output_features);
+    dim3 threadsPerBlock(THREADS_PER_BLOCK, 1);
+    dim3 numBlocks((num_points + THREADS_PER_BLOCK - 1) / THREADS_PER_BLOCK, num_grids);
+    encodeForwardKernel<<<numBlocks, threadsPerBlock>>>(
+        num_points, num_grids, features_per_grid, D, H, W,
+        query_points, rotation_matrices, translations, feature_grids, output_features
+    );
     
     cudaFree(rotation_matrices);
 }

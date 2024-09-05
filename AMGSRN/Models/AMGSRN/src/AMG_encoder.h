@@ -68,3 +68,5 @@ void launch_density_backward(
     float* dL_dRotations,
     float* dL_dScales,
     float* dL_dTranslations);
+
+torch::Tensor quaternion_to_rotation_matrix(const torch::Tensor& q);

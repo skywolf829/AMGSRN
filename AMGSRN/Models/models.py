@@ -172,6 +172,9 @@ def create_model(opt):
         elif(opt['model'] == "NGP"):
             from Models.NGP import NGP
             return NGP(opt)
+        elif(opt['model'] == "TVAMGSRN"):
+            from Models.TVAMGSRN import TVAMGSRN
+            return TVAMGSRN(opt)
    
 def sample_grid(model, grid, align_corners:bool = False,
                 device:str="cuda", data_device:str="cuda", max_points:int = 100000):
