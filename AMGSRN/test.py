@@ -89,10 +89,10 @@ def model_reconstruction_chunked(model, opt):
         os.path.join(output_folder, 
         "Reconstruction", opt['save_name']+".nc"))
     
-def test_psnr(model, opt):
+def test_psnr(model, dataset, opt):
     
     # Load the reference data
-    data = Dataset(opt).data
+    data = dataset.data[dataset.default_timestep]
     
     grid = list(data.shape[2:])
     
@@ -134,7 +134,7 @@ def test_grid_influence(model, opt):
     worst = np.argmin(grid_influences)
     print(f"Weakest influence - grid {worst}: {grid_influences[worst] :0.08f} RMSE")
 
-def test_psnr_chunked(model, opt):
+def test_psnr_chunked(model, dataset, opt):
     
     data_max = None
     data_min = None
@@ -156,7 +156,7 @@ def test_psnr_chunked(model, opt):
                     
                     opt['extents'] = f"{z_ind},{z_ind_end},{y_ind},{y_ind_end},{x_ind},{x_ind_end}"
                     print(f"Extents: {z_ind},{z_ind_end},{y_ind},{y_ind_end},{x_ind},{x_ind_end}")
-                    data = Dataset(opt).data
+                    data = dataset.data[dataset.default_timestep]
                     data = data[0].flatten(1,-1).permute(1,0)
                     
                     if(data_max is None):
@@ -204,10 +204,8 @@ def test_psnr_chunked(model, opt):
     print(f"Data min/max: {data_min}/{data_max}")
     print(f"PSNR: {y.item() : 0.03f}")
 
-def error_volume(model, opt):
+def error_volume(model, dataset, opt):
     
-    # Load the reference data
-    dataset = Dataset(opt)
     
     grid = list(dataset.data.shape[2:])
     
@@ -354,19 +352,19 @@ def feature_locations(model, opt):
         
         print(f"Largest/smallest transformed points: {transformed_points.min()} {transformed_points.max()}")
     
-def perform_tests(model, tests, opt):
+def perform_tests(model, dataset, tests, opt):
     if("reconstruction" in tests):
         model_reconstruction_chunked(model, opt),
     if("feature_locations" in tests):
         feature_locations(model, opt)
     if("error_volume" in tests):
-        error_volume(model, opt)
+        error_volume(model, dataset, opt)
     if("scale_distribution" in tests):
         scale_distribution(model, opt)
     if("feature_density" in tests):
         feature_density(model, opt)
     if("psnr" in tests):
-        test_psnr_chunked(model, opt)
+        test_psnr_chunked(model, dataset, opt)
     if("histogram" in tests):
         data_hist(model, opt)
     if("throughput" in tests):
@@ -402,10 +400,18 @@ if __name__ == '__main__':
     model = model.to(opt['device'])
     model.train(False)
     model.eval()
-    print(model)
+    dataset = Dataset(opt)
     
     # Perform tests
-    perform_tests(model, tests_to_run, opt)
+    for t in range(opt['n_timesteps']):
+        if opt['n_timesteps'] > 1:
+            print(f"========= Timestep {t} ==========")
+        model.set_default_timestep(t)
+        model.prepare_timestep(t)
+        dataset.set_default_timestep(t)
+        dataset.load_timestep(t)
+        perform_tests(model, dataset, tests_to_run, opt)
+        print()
     
         
     

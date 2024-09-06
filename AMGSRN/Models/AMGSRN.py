@@ -141,6 +141,10 @@ class AMGSRN(nn.Module):
     def transformation_matrices(self):
         return create_transformation_matrices(self.rotations, self.scales, self.translations)
 
+    def set_default_timestep(self, timestep:int):
+        pass
+    def prepare_timestep(self, timestep:int):
+        pass
     def get_transform_parameters(self):
         return [{"params": self._rotations},
                 {"params": self._scales},

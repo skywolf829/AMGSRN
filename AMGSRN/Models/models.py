@@ -110,8 +110,8 @@ def save_model(model,opt):
         for key, tensor in state_dict.items():
             with io.BytesIO() as array_buffer:
                 arr = tensor.cpu().numpy().astype(np.float32)
-                print(key)
-                print(arr)
+                #print(key)
+                #print(arr)
                 array_buffer.write(arr.tobytes())
                 zipf.writestr(key+'.bin', array_buffer.getvalue())
         with io.StringIO() as json_buffer:

@@ -12,12 +12,13 @@ from Models.options import *
 from torch.utils.tensorboard import SummaryWriter
 from Models.losses import *
 import shutil
-from Other.utility_functions import make_coord_grid, create_path, tensor_to_cdf
-from Other.vis_io import get_vts, write_vts, write_pvd, write_vtm
+from Other.utility_functions import make_coord_grid, create_path
+from Other.vis_io import get_vts, write_pvd, write_vtm
 from vtk import vtkMultiBlockDataSet
-import glob
 import numpy as np
 from torch.utils.data import DataLoader
+import glob
+import vtk
 
 project_folder_path = os.path.dirname(os.path.abspath(__file__))
 project_folder_path = os.path.join(project_folder_path, "..")
@@ -49,107 +50,55 @@ def logging(writer, iteration, losses, model, opt, grid_to_sample, dataset,
         log_to_writer(iteration, losses, writer, opt, preconditioning)
     if(opt['log_features_every'] > 0 and \
         iteration % opt['log_features_every'] == 0):
-        log_feature_points(model, dataset, opt, iteration)
-
-def log_feature_density(model, dataset, opt):
-    feat_density = model.feature_density_box(list(dataset.data.shape[2:]))
-    tensor_to_cdf(feat_density.unsqueeze(0).unsqueeze(0), os.path.join(output_folder, "FeatureLocations", 
-        opt['save_name'], "density.nc"))
-    coord_grid = make_coord_grid(list(dataset.data.shape[2:]), 
-        opt['device'], flatten=False,
-        align_corners=True)
-    print(coord_grid.shape)
-    coord_grid_shape = list(coord_grid.shape)
-    coord_grid = coord_grid.view(-1, coord_grid.shape[-1])
-    gaussian_densities = model.feature_density_gaussian(coord_grid)
-    coord_grid_shape[-1] = 1
-    
-    gaussian_densities = gaussian_densities.reshape(coord_grid_shape)
-    print(gaussian_densities.shape)
-
-    gaussian_densities = gaussian_densities.permute(3, 0, 1, 2).unsqueeze(0)
-    tensor_to_cdf(gaussian_densities, os.path.join(output_folder, "FeatureLocations", 
-        opt['save_name'], "gaussian_density.nc"))
-
-def log_feature_points(model, dataset, opt, iteration):
-    feat_grid_shape = [eval(i) for i in opt['feature_grid_shape'].split(',')]
-    feat_grid_shape = [2,2,2]
-    
-    # Dont use feature grid shape - too much overhead
-    # Just use [2,2,2]
-    global_points = make_coord_grid(feat_grid_shape, opt['device'], 
-                    flatten=True, align_corners=True)
-    transformed_points = model.inverse_transform(global_points).detach().cpu()
-
-    transformed_points += 1.0
-    transformed_points *= 0.5 
-    transformed_points *= (torch.tensor(list(dataset.data.shape[2:]))-1).flip(0)
-    transformed_points = transformed_points.detach().cpu()#.flip(-1)
-
-    ids = torch.arange(transformed_points.shape[0])
-    ids = ids.unsqueeze(1).unsqueeze(1)
-    ids = ids.repeat([1, transformed_points.shape[1], 1])
-    transformed_points = torch.cat((transformed_points, ids), dim=2)
-    transformed_points = transformed_points.flatten(0,1).numpy()
-    
-    create_path(os.path.join(output_folder, "FeatureLocations", opt['save_name']))
-    np.savetxt(os.path.join(output_folder, "FeatureLocations", 
-        opt['save_name'], opt['save_name']+"_"+ f"{iteration:05}" +".csv"),
-        transformed_points, delimiter=",", header="x,y,z,id")
+        log_feature_grids(model, dataset, opt, iteration)
 
 def log_feature_grids(model, dataset, opt, iteration):
-    feat_grid_shape = opt['feature_grid_shape'].split(',')
-    feat_grid_shape = [eval(i) for i in feat_grid_shape]
-    feat_grid_shape = [2,2,2]
-    
-    global_points = make_coord_grid(feat_grid_shape, opt['device'], 
-                    flatten=True, align_corners=True)
-    transformed_points = model.transform(global_points)
+    with torch.no_grad():
+        feat_grid_shape = [2, 2, 2]  # Fixed shape for simplicity
+        
+        global_points = make_coord_grid(feat_grid_shape, opt['device'], 
+                        flatten=True, align_corners=True)
+        transformed_points = model.transform(global_points)
 
-    transformed_points += 1.0
-    transformed_points *= 0.5 * (torch.tensor(dataset.data.shape)-1).flip(0)
-    #transformed_points = transformed_points.flip(-1)
-    ids = torch.arange(transformed_points.shape[0])
-    ids = ids.unsqueeze(1).unsqueeze(1)
-    ids = ids.repeat([1, transformed_points.shape[1], 1])
-    transformed_points = torch.cat((transformed_points, ids), dim=2)
-    
-    # use zyx point ordering for vtk files
-    feat_grid_shape_zyx = np.flip(feat_grid_shape)
+        transformed_points += 1.0
+        transformed_points *= 0.5 * (torch.tensor(opt['full_shape'], device=opt['device'])-1).flip(0)
+        
+        ids = torch.arange(transformed_points.shape[0], device=opt['device'])
+        ids = ids.unsqueeze(1).unsqueeze(1)
+        ids = ids.repeat([1, transformed_points.shape[1], 1])
+        transformed_points = torch.cat((transformed_points, ids), dim=2)
+        
+        # use zyx point ordering for vtk files
+        feat_grid_shape_zyx = np.flip(feat_grid_shape)
 
-    # write each grid as a vts file, and aggregate their info in one .pvd file
-    grid_dir = os.path.join(output_folder, "FeatureLocations", opt['save_name'], f"iter{iteration}")
-    create_path(grid_dir)
-    vtsNames = []
-    for i, grid in enumerate(transformed_points):
-        grid_points = grid[:, :3]
-        grid_ids = grid[:, -1]
-        vts = get_vts(feat_grid_shape_zyx, grid_points, scalar_fields={"id": grid_ids})
-        vtsName = f"grid{i:02}_ts{iteration:05}.vts"
-        write_vts(os.path.join(grid_dir, vtsName), vts)
-        vtsNames.append(vtsName)
-    write_pvd(vtsNames, outPath=os.path.join(grid_dir, f"grids_ts{iteration:05}.pvd"))
-
-def log_feature_grids_from_points(opt):
-    logdir = os.path.join(output_folder, "FeatureLocations", opt['save_name'])
-    csvPaths = sorted(glob.glob(os.path.join(logdir, f"*.csv")))
-    grids_iters = np.array([np.genfromtxt(csvPath, delimiter=',') for csvPath in csvPaths])
-    
-    feat_grid_shape = np.array([2,2,2], dtype=int)
-    feat_grid_shape_zyx = np.flip(feat_grid_shape)
-    grids_iters = grids_iters.reshape(len(grids_iters), opt['n_grids'], feat_grid_shape.prod(), 4)
-    
-    vtm_dir = os.path.join(logdir, "vtms")
-    create_path(vtm_dir)
-    for i, grids_iter in enumerate(grids_iters):
+        # Create a single vtkMultiBlockDataSet to hold all grids
         vtm = vtkMultiBlockDataSet()
-        vtm.SetNumberOfBlocks(len(grids_iter))
-        for j, grid in enumerate(grids_iter):
-            grid_points = grid[:, :3]
-            grid_ids = grid[:, -1]
+        vtm.SetNumberOfBlocks(opt['n_grids'])
+
+        for i, grid in enumerate(transformed_points):
+            grid_points = grid[:, :3].cpu().numpy()
+            grid_ids = grid[:, -1].cpu().numpy()
             vts = get_vts(feat_grid_shape_zyx, grid_points, scalar_fields={"id": grid_ids})
-            vtm.SetBlock(j, vts)
-        write_vtm(os.path.join(vtm_dir, f"grids_{i:03}.vtm", ), vtm)
+            vtm.SetBlock(i, vts)
+
+        # Write the vtkMultiBlockDataSet to a single .vtm file
+        grid_dir = os.path.join(output_folder, "FeatureLocations", opt['save_name'], "ts_"+str(dataset.default_timestep))
+        create_path(grid_dir)
+        vtm_filename = f"grids_iter{iteration:05}.vtm"
+        write_vtm(os.path.join(grid_dir, vtm_filename), vtm)
+
+def combine_vtm_files(opt, t):
+    grid_dir = os.path.join(output_folder, "FeatureLocations", opt['save_name'])
+    vtm_files = sorted(glob.glob(os.path.join(grid_dir, f"ts_{t}", "grids_iter*.vtm")))
+    
+    # Create a PVD file to represent time-varying data
+    pvd_filename = os.path.join(grid_dir, f"grids_over_iterations_{t}.pvd")
+    
+    # Extract iteration numbers from filenames to use as timesteps
+    timesteps = [int(os.path.basename(f).split('iter')[1].split('.')[0]) for f in vtm_files]
+    
+    # Write the PVD file using the original VTM files
+    write_pvd(vtm_files, pvd_filename, timesteps)
 
 def train_step_APMGSRN(opt, iteration, batch, dataset, model, optimizer, scheduler, writer, 
                       early_stopping_data=None):
@@ -215,7 +164,7 @@ def train_step_APMGSRN(opt, iteration, batch, dataset, model, optimizer, schedul
         logging(writer, iteration, 
             {"Fitting loss": loss, 
              "Grid loss": density_loss}, 
-            model, opt, dataset.data.shape[2:], dataset, preconditioning='grid')
+            model, opt, opt['full_shape'], dataset, preconditioning='grid')
     return (early_stop_reconstruction, early_stop_grid, 
             early_stopping_reconstruction_losses,
             early_stopping_grid_losses)
@@ -238,23 +187,17 @@ def train_step_vanilla(opt, iteration, batch, dataset, model, optimizer, schedul
     
     logging(writer, iteration, 
         {"Fitting loss": loss.mean()}, 
-        model, opt, dataset.data.shape[2:], dataset)
+        model, opt, opt['full_shape'], dataset)
 
-def train( model, dataset, opt):
+def train_model(model, dataset, opt):
     model = model.to(opt['device'])
-    print(model)
+    
     print("Training on %s" % (opt["device"]), 
         os.path.join(save_folder, opt["save_name"]))
     
 
-    if(os.path.exists(os.path.join(project_folder_path, "tensorboard", opt['save_name']))):
-        shutil.rmtree(os.path.join(project_folder_path, "tensorboard", opt['save_name']))
-    
-    if(os.path.exists(os.path.join(output_folder, "FeatureLocations", opt['save_name']))):
-        shutil.rmtree(os.path.join(output_folder, "FeatureLocations", opt['save_name']))
-    
     if(opt['log_every'] > 0):
-        writer = SummaryWriter(os.path.join('tensorboard',opt['save_name']))
+        writer = SummaryWriter(os.path.join('tensorboard', opt['save_name'], "ts_"+str(dataset.default_timestep)))
     else: 
         writer = None
     dataloader = DataLoader(dataset, 
@@ -328,15 +271,27 @@ def train( model, dataset, opt):
     #writer.add_graph(model, torch.zeros([1, 3], device=opt['device'], dtype=torch.float32))
     if(opt['log_every'] > 0):
         writer.close()
-    save_model(model, opt)
 
-def train_timevarying(model, dataset, opt):
+def train(model, dataset, opt):
+    if(os.path.exists(os.path.join(project_folder_path, "tensorboard", opt['save_name']))):
+        shutil.rmtree(os.path.join(project_folder_path, "tensorboard", opt['save_name']))
+    
+    if(os.path.exists(os.path.join(output_folder, "FeatureLocations", opt['save_name']))):
+        shutil.rmtree(os.path.join(output_folder, "FeatureLocations", opt['save_name']))
+
     for t in range(dataset.n_timesteps):
         model.set_default_timestep(t)
         model.prepare_timestep(t)
         dataset.set_default_timestep(t)
         dataset.load_timestep(t)
-        train(model, dataset, opt)
+        train_model(model, dataset, opt)
+        dataset.unload_timestep(t)
+        
+        opt['iteration_number'] = 0
+        save_model(model, opt)
+        combine_vtm_files(opt, t)
+
+
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Trains an implicit model on data.')
@@ -479,10 +434,5 @@ if __name__ == '__main__':
     start_time = time.time()
     
     train(model, dataset, opt)
-    if(opt['log_features_every'] > 0):
-       log_feature_grids_from_points(opt)
-        
-    opt['iteration_number'] = 0
-    save_model(model, opt)
     
 

@@ -4,6 +4,7 @@ import xml.etree.ElementTree as ET
 import numpy as np
 # from tqdm import tqdm
 import json
+import os
 
 # zero-pad an axis to length
 def np_zeropad(arr, length, axis):
@@ -270,3 +271,26 @@ def write_pvd(vtkPath:list, outPath:str, timesteps=None):
   
   pvd_et = ET.ElementTree(vtkfile)
   pvd_et.write(outPath, xml_declaration=True)
+
+def merge_vtm_files(input_files, output_file):
+    # Create a new vtkMultiBlockDataSet to hold all the merged data
+    merged_vtm = vtk.vtkMultiBlockDataSet()
+
+    # Read and merge each input .vtm file
+    for i, input_file in enumerate(input_files):
+        reader = vtk.vtkXMLMultiBlockDataReader()
+        reader.SetFileName(input_file)
+        reader.Update()
+
+        input_vtm = reader.GetOutput()
+
+        # Add each block from the input file to the merged dataset
+        for j in range(input_vtm.GetNumberOfBlocks()):
+            block = input_vtm.GetBlock(j)
+            merged_vtm.SetBlock(merged_vtm.GetNumberOfBlocks(), block)
+
+    # Write the merged dataset to the output file
+    writer = vtk.vtkXMLMultiBlockDataWriter()
+    writer.SetFileName(output_file)
+    writer.SetInputData(merged_vtm)
+    writer.Write()

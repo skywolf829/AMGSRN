@@ -41,7 +41,8 @@ class AMG_encoder_old(nn.Module):
             self.init_grids_large()
         else:
             self.randomize_grids()
-        
+
+
     def init_grids_large(self):  
         with torch.no_grad():     
             d = self.feature_grids.device
@@ -304,6 +305,12 @@ class AMGSRN_old(nn.Module):
             persistent=False
         )
 
+    
+    def set_default_timestep(self, timestep:int):
+        pass
+    def prepare_timestep(self, timestep:int):
+        pass
+    
     def get_transform_parameters(self):
         return [{"params": self.encoder.transformation_matrices}]
     

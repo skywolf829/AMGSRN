@@ -1,0 +1,434 @@
+<html lang="en">
+	<head>
+		<title>AMGSRN Neural Volume Render</title>
+		<meta charset="utf-8">
+		<meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">
+		<link rel="stylesheet" href="css/style.css">
+	</head>
+	<body>
+		<div id="info">
+			<div id="timestamps" style="
+				position: absolute;
+				top: 60px;
+				left: 0;
+				padding: 10px;
+				background: rgba( 0, 0, 0, 0.5 );
+				color: #fff;
+				font-family: monospace;
+				font-size: 12px;
+				line-height: 1.5;
+				pointer-events: none;
+				text-align: left;
+			"></div>
+		</div>
+
+		
+		<script type="importmap">
+			{
+				"imports": {
+					"three": "./js/three.webgpu.168dev.js",
+					"three/tsl": "./js/three.webgpu.168dev.js",
+					"three/addons/": "./js/"
+				}
+			}
+		</script>
+		<script src="./js/jszip.min.js"></script>
+		<script type="module">
+
+			import * as THREE from 'three';
+			import { Fn, instanceIndex, pass, mrt, output,
+				float, vec3, uvec2, vec4, uint, vec2, mat4,
+				storage, textureStore, texture, uniform, storageObject,
+				modelWorldMatrix, cameraViewMatrix, cameraProjectionMatrix, cameraPosition,
+				positionGeometry, positionLocal, positionWorld, positionView,
+				If, Break, Continue, Loop,
+				normalize, modelWorldMatrixInverse,
+				smoothstep, materialReference
+			 } from 'three/tsl';
+
+			import { OrbitControls } from 'three/addons/OrbitControls.js';
+			import Stats from 'three/addons/stats.module.js';
+
+			import { GUI } from 'three/addons/lil-gui.module.min.js';
+
+			let material;
+			let postProcessing;
+			let camera, scene, renderer;
+			let controls, stats;
+			let computeShaderTexture;
+			let frontTexture, backTexture;
+			let frontBackShader, compute_frontBackShader = null;
+			let computeShader, compute_computeShader = null;
+			let scenePass;
+			let colorPass, maskPass;
+			let renderTarget;
+			let pixelBuffer, pixelBufferTexture;
+			let width, height;
+			let volumeWidth=uniform(1);
+			let volumeHeight = uniform(1);
+			let volumeDepth=uniform(1);
+			let modelLoaded = uniform(0).label('modelLoaded');
+			let numGrids = uniform(0).label('numGrids');
+			let matrixBufferAttribute, matrixStorage, matrixStorageRead;
+			let mlpBufferAttribute, mlpStorage;
+			const timestamps = document.getElementById( 'timestamps' );
+			
+			init();
+
+			function init() {
+
+				const { innerWidth, innerHeight } = window;
+				width = 512;
+				height = 512;
+				console.log(innerHeight);
+				computeShaderTexture = new THREE.StorageTexture( width, height );
+				frontTexture = new THREE.StorageTexture( width, height );
+				frontTexture.type = THREE.HalfFloatType;
+				backTexture = new THREE.StorageTexture( width, height );
+				backTexture.type = THREE.HalfFloatType;
+
+				renderTarget = new THREE.RenderTarget(
+					width,//innerWidth * devicePixelRatio,
+					height,//innerHeight * devicePixelRatio,
+					{ count: 4, minFilter: THREE.NearestFilter, magFilter: THREE.NearestFilter }
+				);
+				renderTarget.textures[0].format = THREE.RedFormat;
+				renderTarget.textures[0].type = THREE.UnsignedByteType;
+				renderTarget.textures[1].format = THREE.RGBAFormat;
+				renderTarget.textures[1].type = THREE.HalfFloatType;
+				renderTarget.textures[2].format = THREE.RGBAFormat;
+				renderTarget.textures[2].type = THREE.HalfFloatType;
+				renderTarget.textures[3].format = THREE.RGBAFormat;
+				renderTarget.textures[3].type = THREE.HalfFloatType;
+
+				//renderTarget.textures[ 0 ].name = 'output';
+				renderTarget.textures[ 0 ].name = 'mask';
+				renderTarget.textures[ 1 ].name = 'worldPos';
+				renderTarget.textures[ 2 ].name = 'localPos';
+				renderTarget.textures[ 3 ].name = 'rayDirection';
+				camera = new THREE.PerspectiveCamera( 50, innerWidth / innerHeight, .1, 1000 );
+				camera.position.set( 1, 1, 1 );
+
+				scene = new THREE.Scene();
+				scene.background =  new THREE.Color( 0x000000 );
+
+				const helper = new THREE.GridHelper( 60, 40, 0x303030, 0x303030 );
+				//scene.add( helper );
+				
+				material = new THREE.MeshBasicNodeMaterial( { color: 0xffffff } );
+				material.mrtNode = mrt({
+					mask: vec4(1.0),
+					worldPos: positionWorld,
+					localPos: positionLocal,
+					//rayDirection: normalize(positionWorld.sub(cameraPosition))
+					rayDirection: normalize(positionLocal.sub(modelWorldMatrixInverse.mul(vec4(cameraPosition, 1.0)).xyz))
+				});
+				material.colorNode = positionLocal;
+				const volumeBox = new THREE.Mesh( new THREE.BoxGeometry(volumeWidth.value, 
+					volumeHeight.value, volumeDepth.value), material );
+				//volumeBox.position.set(1,1,1);
+				scene.add( volumeBox );
+
+				renderer = new THREE.WebGPURenderer( { antialias: true, trackTimestamp: true } );
+				renderer.setPixelRatio( window.devicePixelRatio );
+				renderer.setSize( window.innerWidth, window.innerHeight );
+				renderer.setAnimationLoop( animate );
+				renderer.setMRT( mrt( {
+					mask: vec4( 0 ),
+					worldPos: vec4(0),
+					localPos: vec4(0),
+					rayDirection: vec4(0)
+				} ) );
+				
+				frontBackShader = Fn(({volWorldInv}) => {
+					
+					const w = uint(width);
+					const h = uint(height);
+					const posX = instanceIndex.modInt( w );
+					const posY = instanceIndex.div( w );
+					const indexUV = uvec2( posX, posY );
+					const indexNorm = vec2(float(posX).div(w), float(posY).div(h));
+					const maskValue = texture(renderTarget.textures[0], indexNorm);
+					const localPos = texture(renderTarget.textures[2], indexNorm);
+					//const rayDirLocal = normalize(localPos.sub(volWorldInv.mul(vec4(camPos, 1.0)).xyz))
+
+					If(modelLoaded.equal(1), () => {
+						If(maskValue.r.equal(1), () => {
+							textureStore(frontTexture, indexUV, vec4(1,1,1.0)).toWriteOnly();
+						}).Else(() => {
+							textureStore(frontTexture, indexUV, vec4(0,0,0,1)).toWriteOnly();
+						});
+					}).Else( () => {
+						textureStore(frontTexture, indexUV, vec4(0,0,0,1)).toWriteOnly();
+					});
+				});
+				compute_frontBackShader = frontBackShader(
+					{volWorldInv: mat4(modelWorldMatrixInverse)}
+				).compute(width*height);
+
+				computeShader = Fn(({M_T}) => {
+					
+					const w = uint(width);
+					const h = uint(height);
+					const posX = instanceIndex.modInt( w );
+					const posY = instanceIndex.div( w );
+					const indexUV = uvec2( posX, posY );
+					const indexNorm = vec2(float(posX).div(w), float(posY).div(h));
+					const maskValue = texture(renderTarget.textures[0], indexNorm);
+					const worldPos = texture(renderTarget.textures[1], indexNorm);
+					const localPos = texture(renderTarget.textures[2], indexNorm);
+					const rayDir = texture(renderTarget.textures[3], indexNorm);
+					const stepSize = float(0.001);
+
+					const c = vec3(0.0,0.0,0.0).toVar();
+					const x = vec3(localPos).toVar();
+
+					If(modelLoaded.equal(1), () => {
+						If(maskValue.r.equal(1), () => {							
+							Loop( { start: uint(0), end: uint( 1000 ), type: 'uint', condition: '<' }, ( { dontcare } ) => {
+								If(x.x.lessThanEqual(float(0.5)).and(x.x.greaterThanEqual(float(-0.5)))
+									.and(x.y.lessThanEqual(float(0.5))).and(x.y.greaterThanEqual(float(-0.5)))
+									.and(x.z.lessThanEqual(float(0.5))).and(x.z.greaterThanEqual(float(-0.5))), () => {
+										Loop( { start: uint(0), end: uint( numGrids ), type: 'uint', condition: '<' }, ( { i } ) => {
+											const mat = M_T.element(i);
+											const x_t = vec3(mat.mul(x.mul(float(2))));
+											If(x_t.x.lessThanEqual(float(1)).and(x_t.x.greaterThanEqual(float(-1)))
+											.and(x_t.y.lessThanEqual(float(1))).and(x_t.y.greaterThanEqual(float(-1)))
+											.and(x_t.z.lessThanEqual(float(1))).and(x_t.z.greaterThanEqual(float(-1))), () => {
+												
+												c.addAssign(vec3(0.0001));
+											});
+										});
+										
+										//c.addAssign(vec3(0.001));
+								});
+								x.addAssign(rayDir.mul(stepSize));
+							});
+							//textureStore(computeShaderTexture, indexUV, localPos).toWriteOnly();
+							textureStore(computeShaderTexture, indexUV, vec4(c, 1.0)).toWriteOnly();
+						}).Else(() => {
+							textureStore(computeShaderTexture, indexUV, vec4(0,0,0,1)).toWriteOnly();
+						});
+					}).Else( () => {
+						textureStore(computeShaderTexture, indexUV, vec4(0,0,0,1)).toWriteOnly();
+					});
+					
+				});
+
+
+				postProcessing = new THREE.PostProcessing( renderer );
+				//postProcessing.outputNode = texture(pixelBufferTexture);
+				postProcessing.outputNode = texture(computeShaderTexture);
+
+
+				document.body.appendChild( renderer.domElement );
+
+				stats = new Stats();
+				stats.domElement.style.position = 'absolute';
+				stats.domElement.style.top = '0px';
+				document.body.appendChild( stats.dom );
+
+				const dropArea = renderer.domElement;
+				console.log(dropArea);
+				// Prevent default drag behaviors
+				['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+					dropArea.addEventListener(eventName, preventDefaults, false);
+				});
+
+				function preventDefaults(e) {
+					e.preventDefault();
+					e.stopPropagation();
+				}
+
+				// Handle the drop event
+				dropArea.addEventListener('drop', handleDrop, false);
+				
+				
+
+				controls = new OrbitControls( camera, renderer.domElement );
+				controls.minDistance = 1.0;
+				controls.maxDistance = 20;
+				controls.target.set( 0, 0, 0 );
+				controls.update();
+
+				
+				window.addEventListener('resize', onWindowResize);
+
+				const gui = new GUI();
+
+				// Load a model by default
+				fetch("./web_model.zip")
+					.then(response => response.arrayBuffer())
+					.then(data => loadZip(data));
+
+				gui.add(volumeBox.scale, 'x', .01, 100, 0.01 ).name( 'volumeWidth' )
+				gui.add(volumeBox.scale, 'y', .01, 100, 0.01 ).name( 'volumeHeight' )
+				gui.add(volumeBox.scale, 'z', .01, 100, 0.01 ).name( 'volumeDepth' );
+				//	.onChange(( v ) => volumeDepth.value = v );
+
+				
+				
+
+			}
+
+			async function handleDrop(e) {
+				const dt = e.dataTransfer;
+				const files = dt.files;
+
+				if (files.length !== 1 || !files[0].name.endsWith('.zip')) {
+					alert("Please drop exactly one .zip file.");
+					return;
+				}
+
+				const zipFile = files[0];
+				loadZip(zipFile);
+			}
+			
+			async function loadZip(zipFile){
+				const zip = new JSZip();
+
+				try {
+					const content = await zip.loadAsync(zipFile);
+					let jsonData = null;
+					const binDataDict = {};
+
+					const jsonFile = content.file("options.json");
+					if (jsonFile) {
+						const jsonText = await jsonFile.async("string");
+						jsonData = JSON.parse(jsonText);
+						console.log(jsonData);
+					}
+
+					const binFiles = Object.keys(content.files).filter(name => name.endsWith('.bin'));
+					for (const binFileName of binFiles) {
+						const binFile = content.file(binFileName);
+						const binArrayBuffer = await binFile.async("arraybuffer");
+						const floatArray = new Float32Array(binArrayBuffer);
+						binDataDict[binFileName] = floatArray;
+						console.log(`${binFileName}: ${floatArray.length} floats\n`);
+					}
+					loadModelData(jsonData, binDataDict);
+
+				} catch (err) {
+					console.error("Error reading ZIP file:", err);
+				}
+			}
+			
+			async function loadModelData(jsonData, binDataDict) {
+				console.log("Loading model data");
+				const num_grids = jsonData['n_grids'];
+
+				// update the transformation matrices
+				let transformation_matrices = new Float32Array(16*num_grids).fill(0);
+				for(let i = 0; i < num_grids; i++){
+					const o = 16*i;
+					let q = binDataDict['_rotations.bin'].slice(4*i,4*(i+1));
+					let s = binDataDict['_scales.bin'].slice(3*i,3*(i+1));
+					let t = binDataDict['translations.bin'].slice(3*i,3*(i+1));
+					for (let j = 0; j < s.length; j++){
+						s[j] = Math.exp(s[j]);
+					}
+					const magnitude = Math.sqrt(q[0] * q[0] + q[1] * q[1] + q[2] * q[2] + q[3] * q[3]);
+					if (magnitude > 0.0) {
+						const invMagnitude = 1.0 / magnitude;
+						q[0] *= invMagnitude;
+						q[1] *= invMagnitude;
+						q[2] *= invMagnitude;
+						q[3] *= invMagnitude;
+					}
+					const wx = q[0] * q[3];
+					const wy = q[1] * q[3];
+					const wz = q[2] * q[3];
+					const xx = q[0] * q[0];
+					const xy = q[0] * q[1];
+					const xz = q[0] * q[2];
+					const yy = q[1] * q[1];
+					const yz = q[1] * q[2];
+					const zz = q[2] * q[2];
+
+					transformation_matrices[o + 0] = s[0] * (1.0 - 2.0 * (yy + zz));
+					transformation_matrices[o + 1] = s[1] * (2.0 * (xy - wz));
+					transformation_matrices[o + 2] = s[2] * (2.0 * (xz + wy));
+					transformation_matrices[o + 3] = t[0];
+
+					transformation_matrices[o + 4] = s[0] * (2.0 * (xy + wz));
+					transformation_matrices[o + 5] = s[1] * (1.0 - 2.0 * (xx + zz));
+					transformation_matrices[o + 6] = s[2] * (2.0 * (yz - wx));    
+					transformation_matrices[o + 7] = t[1];
+
+					transformation_matrices[o + 8] = s[0] * (2.0 * (xz - wy));
+					transformation_matrices[o + 9] = s[1] * (2.0 * (yz + wx));
+					transformation_matrices[o + 10] = s[2] * (1.0 - 2.0 * (xx + yy));
+					transformation_matrices[o + 11] = t[2];
+
+					transformation_matrices[o + 12] = t[0];
+					transformation_matrices[o + 13] = t[1];
+					transformation_matrices[o + 14] = t[2];
+					transformation_matrices[o + 15] = 1.0;
+				}					
+				// update the texture for mlp weights
+				let mlp_array = binDataDict['decoder.0.linear.weight.bin'];
+				for(let i = 1; i < jsonData['n_layers']; i++){
+					mlp_array = [...mlp_array, ...binDataDict['decoder.'+i+'.linear.weight.bin']];
+				}
+				mlp_array = [...mlp_array, ...binDataDict['decoder.'+jsonData['n_layers']+'.weight.bin']];
+				console.log("mlp_array length " + mlp_array.length);
+
+				modelLoaded.value = 1;
+				numGrids.value = num_grids;
+				matrixBufferAttribute = new THREE.StorageBufferAttribute(transformation_matrices, 16);
+				matrixStorage = storage(matrixBufferAttribute, 'mat4', matrixBufferAttribute.count).label('matrixStorage');
+				matrixStorageRead = storageObject(matrixBufferAttribute, 'mat4', matrixBufferAttribute.count).toReadOnly();
+				console.log(matrixStorage)
+				console.log(matrixBufferAttribute.count)
+				compute_computeShader = computeShader({M_T: matrixStorageRead}).compute(width*height);
+			}
+			
+			function onWindowResize() {
+
+				const { innerWidth, innerHeight } = window;
+
+				camera.aspect = innerWidth / innerHeight;
+				camera.updateProjectionMatrix();
+				const dpr = renderer.getPixelRatio();
+				renderTarget.setSize( window.innerWidth * dpr, window.innerHeight * dpr );
+
+				renderer.setSize( innerWidth, innerHeight );
+
+			}
+
+			async function animate() {
+				stats.update();
+				renderer.setRenderTarget(renderTarget);
+				await renderer.renderAsync(scene, camera);
+
+				// 1. Compute entry/exit points
+				//if(compute_frontBackShader != null) await renderer.computeAsync(compute_frontBackShader);
+				// 2. Compute NN output for linspace(entry, exit, stepsize)
+				// 3. Transfer function and composite each ray's values
+				if(compute_computeShader != null) await renderer.computeAsync(compute_computeShader);
+				renderer.setRenderTarget(null);
+				await postProcessing.renderAsync();
+
+				// throttle the logging
+
+				if ( renderer.hasFeature( 'timestamp-query' ) ) {
+
+					if ( renderer.info.render.calls % 5 === 0 ) {
+						timestamps.innerHTML = 'Timestamp queries not supported';
+						
+					}
+
+				} else {
+
+					timestamps.innerHTML = 'Timestamp queries not supported';
+
+				}
+
+
+			}
+
+		</script>
+
+	</body>
+</html>
