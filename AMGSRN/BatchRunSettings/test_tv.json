@@ -2,6 +2,6 @@
     [ "test.py",
         {        
         "load_from": "supernova_tv",
-        "tests": "psnr"
+        "tests": "psnr,reconstruction"
     }]
 ]

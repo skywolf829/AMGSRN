@@ -31,7 +31,7 @@ def model_reconstruction(model, opt):
         os.path.join(output_folder, 
         "Reconstruction", opt['save_name']+".nc"))
 
-def model_reconstruction_chunked(model, opt):
+def model_reconstruction_chunked(model, opt, timestep):
     
     chunk_size = 512
     full_shape = opt['full_shape']
@@ -87,7 +87,7 @@ def model_reconstruction_chunked(model, opt):
     create_path(os.path.join(output_folder, "Reconstruction"))
     tensor_to_cdf(output, 
         os.path.join(output_folder, 
-        "Reconstruction", opt['save_name']+".nc"))
+        "Reconstruction", opt['save_name']+"_timestep_"+str(timestep)+".nc"))
     
 def test_psnr(model, dataset, opt):
     
@@ -352,9 +352,9 @@ def feature_locations(model, opt):
         
         print(f"Largest/smallest transformed points: {transformed_points.min()} {transformed_points.max()}")
     
-def perform_tests(model, dataset, tests, opt):
+def perform_tests(model, dataset, tests, opt, timestep):
     if("reconstruction" in tests):
-        model_reconstruction_chunked(model, opt),
+        model_reconstruction_chunked(model, opt, timestep),
     if("feature_locations" in tests):
         feature_locations(model, opt)
     if("error_volume" in tests):
@@ -407,10 +407,11 @@ if __name__ == '__main__':
         if opt['n_timesteps'] > 1:
             print(f"========= Timestep {t} ==========")
         model.set_default_timestep(t)
-        model.prepare_timestep(t)
         dataset.set_default_timestep(t)
         dataset.load_timestep(t)
-        perform_tests(model, dataset, tests_to_run, opt)
+        perform_tests(model, dataset, tests_to_run, opt, timestep=t)
+        dataset.unload_timestep(t)
+        model.unload_timestep(t)
         print()
     
         

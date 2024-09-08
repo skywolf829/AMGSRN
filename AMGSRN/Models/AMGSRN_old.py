@@ -310,7 +310,8 @@ class AMGSRN_old(nn.Module):
         pass
     def prepare_timestep(self, timestep:int):
         pass
-    
+    def unload_timestep(self, timestep:int):
+        self.to('cpu')
     def get_transform_parameters(self):
         return [{"params": self.encoder.transformation_matrices}]
     

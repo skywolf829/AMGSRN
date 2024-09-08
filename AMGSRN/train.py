@@ -26,7 +26,7 @@ data_folder = os.path.join(project_folder_path, "Data")
 output_folder = os.path.join(project_folder_path, "Output")
 save_folder = os.path.join(project_folder_path, "SavedModels")
 
-def log_to_writer(iteration, losses, writer, opt, preconditioning=None):
+def log_to_writer(iteration, losses, writer, opt):
     with torch.no_grad():   
         print_str = f"Iteration {iteration}/{opt['iterations']}, "
         for key in losses.keys():
@@ -37,17 +37,11 @@ def log_to_writer(iteration, losses, writer, opt, preconditioning=None):
         if("cuda" in opt['device']):
             GBytes = (torch.cuda.max_memory_allocated(device=opt['device']) \
                 / (1024**3))
-            if preconditioning is None:
-                writer.add_scalar('GPU memory (GB)', GBytes, iteration)
-            elif "model" in preconditioning:
-                writer.add_scalar('Preconditioning model GPU memory (GB)', GBytes, iteration)
-            elif "grid" in preconditioning:
-                writer.add_scalar('Preconditioning grid GPU memory (GB)', GBytes, iteration)
+            writer.add_scalar('GPU memory (GB)', GBytes, iteration)
 
-def logging(writer, iteration, losses, model, opt, grid_to_sample, dataset, 
-            preconditioning=None):
+def logging(writer, iteration, losses, model, opt, grid_to_sample, dataset):
     if(opt['log_every'] > 0 and iteration % opt['log_every'] == 0):
-        log_to_writer(iteration, losses, writer, opt, preconditioning)
+        log_to_writer(iteration, losses, writer, opt)
     if(opt['log_features_every'] > 0 and \
         iteration % opt['log_features_every'] == 0):
         log_feature_grids(model, dataset, opt, iteration)
@@ -58,7 +52,7 @@ def log_feature_grids(model, dataset, opt, iteration):
         
         global_points = make_coord_grid(feat_grid_shape, opt['device'], 
                         flatten=True, align_corners=True)
-        transformed_points = model.transform(global_points)
+        transformed_points = model.inverse_transform(global_points)
 
         transformed_points += 1.0
         transformed_points *= 0.5 * (torch.tensor(opt['full_shape'], device=opt['device'])-1).flip(0)
@@ -164,7 +158,7 @@ def train_step_APMGSRN(opt, iteration, batch, dataset, model, optimizer, schedul
         logging(writer, iteration, 
             {"Fitting loss": loss, 
              "Grid loss": density_loss}, 
-            model, opt, opt['full_shape'], dataset, preconditioning='grid')
+            model, opt, opt['full_shape'], dataset)
     return (early_stop_reconstruction, early_stop_grid, 
             early_stopping_reconstruction_losses,
             early_stopping_grid_losses)
@@ -281,11 +275,12 @@ def train(model, dataset, opt):
 
     for t in range(dataset.n_timesteps):
         model.set_default_timestep(t)
-        model.prepare_timestep(t)
         dataset.set_default_timestep(t)
+        model.prepare_timestep(t)
         dataset.load_timestep(t)
         train_model(model, dataset, opt)
         dataset.unload_timestep(t)
+        model.unload_timestep(t)
         
         opt['iteration_number'] = 0
         save_model(model, opt)
@@ -335,9 +330,7 @@ if __name__ == '__main__':
     parser.add_argument('--save_name',default=None,type=str,
         help='Save name for the model')
     parser.add_argument('--align_corners',default=None,type=str2bool,
-        help='Aligns corners in implicit model.')    
-    parser.add_argument('--precondition',default=None,type=str2bool,
-        help='Preconditions the grid transformations.')    
+        help='Aligns corners in implicit model.')      
     parser.add_argument('--n_layers',default=None,type=int,
         help='Number of layers in the model')
     parser.add_argument('--nodes_per_layer',default=None,type=int,

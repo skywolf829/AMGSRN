@@ -36,6 +36,9 @@ class TVAMGSRN(nn.Module):
             t = self.default_timestep
         return self.models[t].transformation_matrices
 
+    def unload_timestep(self, timestep:int):
+        self.models[timestep].to('cpu')
+
     def get_model_parameters(self):
         return self.models[self.default_timestep].get_model_parameters()
 
@@ -65,16 +68,8 @@ class TVAMGSRN(nn.Module):
                 self.models[t]._rotations = nn.Parameter(self.models[t-1]._rotations.clone().detach())
                 self.models[t]._scales = nn.Parameter(self.models[t-1]._scales.clone().detach())
                 
-                # Clone decoder weights
-                for layer_t, layer_t_minus_1 in zip(self.models[t].decoder.children(), self.models[t-1].decoder.children()):
-                    if isinstance(layer_t, (nn.Linear, ReLULayer)):
-                        if isinstance(layer_t, ReLULayer):
-                            layer_t = layer_t.linear
-                            layer_t_minus_1 = layer_t_minus_1.linear
-                        
-                        layer_t.weight = nn.Parameter(layer_t_minus_1.weight.clone().detach())
-                        if layer_t.bias is not None:
-                            layer_t.bias = nn.Parameter(layer_t_minus_1.bias.clone().detach())
+                # Create an exact copy of the decoder from the previous timestep
+                self.models[t].decoder.load_state_dict(self.models[t-1].decoder.state_dict())
 
     def transform(self, x: torch.Tensor, t: int = None) -> torch.Tensor:
         if t is None:
