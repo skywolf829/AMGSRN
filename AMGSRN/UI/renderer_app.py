@@ -166,6 +166,7 @@ class MainWindow(QMainWindow):
     frame_time = pyqtSignal(float)
     vram_use = pyqtSignal(float)
     status_text_update = pyqtSignal(str)
+    timestep_max = pyqtSignal(int)
     render_worker = None
     
     def __init__(self, parent=None):
@@ -257,6 +258,19 @@ class MainWindow(QMainWindow):
         self.tf_rescale_slider_box.addWidget(self.tf_rescale_slider_mintxt)
         self.tf_rescale_slider_box.addWidget(self.tf_rescale_slider)
         self.tf_rescale_slider_box.addWidget(self.tf_rescale_slider_maxtxt)
+
+        self.timestep_selector_box = QHBoxLayout()      
+        self.timestep_selector_label = QLabel("Timestep: 0")  
+        self.timestep_selector_box.addWidget(self.timestep_selector_label)
+        self.timestep_slider = QSlider(Qt.Horizontal)
+        self.timestep_slider.setMinimum(0)
+        self.timestep_slider.setMaximum(1)
+        self.timestep_slider.setValue(0)   
+        self.timestep_slider.setTickPosition(QSlider.TicksBelow)
+        self.timestep_slider.setTickInterval(1)  
+        self.timestep_slider.valueChanged.connect(self.change_timestep)
+        #self.timestep_slider.sliderReleased.connect(self.change_timestep)
+        self.timestep_selector_box.addWidget(self.timestep_slider)   
         
         x = np.linspace(0.0, 1.0, 4)
         pos = np.column_stack((x, x))
@@ -283,6 +297,7 @@ class MainWindow(QMainWindow):
         self.frame_time_label = QLabel("Last frame time: -- sec.") 
         self.status_text_update.connect(self.update_status_text)
         self.vram_use.connect(self.update_vram)
+        self.timestep_max.connect(self.update_timestep_max)
         self.updates_per_second.connect(self.update_updates)
         self.frame_time.connect(self.update_frame_time)
         self.save_img_button = QPushButton("Save image")
@@ -296,6 +311,7 @@ class MainWindow(QMainWindow):
         self.settings_ui.addWidget(self.view_xy_button)
         self.settings_ui.addLayout(self.transfer_function_box)
         self.settings_ui.addLayout(self.tf_rescale_slider_box)
+        self.settings_ui.addLayout(self.timestep_selector_box)
         self.settings_ui.addStretch()
         self.settings_ui.addWidget(self.status_text)
         self.settings_ui.addWidget(self.memory_use_label)
@@ -342,7 +358,11 @@ class MainWindow(QMainWindow):
         
     def update_vram(self, val):
         self.memory_use_label.setText(f"VRAM use: {val:0.02f} GB")
-        
+    
+    def update_timestep_max(self, val):
+        print(f"Updating timestep max to {val}")
+        self.timestep_slider.setMaximum(val)
+    
     def update_updates(self, val):
         self.update_framerate_label.setText(f"Update framerate: {val:0.02f} fps")
     
@@ -421,6 +441,11 @@ class MainWindow(QMainWindow):
         val = int(self.batch_slider.value())
         self.batch_slider_label.setText(f"Batch size (2^x): {val}")
         self.render_worker.change_batch_size.emit(val)
+     
+    def change_timestep(self):
+        val = int(self.timestep_slider.value())
+        self.timestep_selector_label.setText(f"Timestep: {val}")
+        self.render_worker.change_timestep.emit(val)
      
     def change_spp_visual(self):
         val = int(self.spp_slider.value())
@@ -503,6 +528,7 @@ class RendererThread(QObject):
     load_new_data = pyqtSignal(str)
     change_transfer_function = pyqtSignal(str)
     change_batch_size = pyqtSignal(int)
+    change_timestep = pyqtSignal(int)
     change_opacity_controlpoints = pyqtSignal(np.ndarray, np.ndarray)
     view_xy = pyqtSignal()
     tf_rescale = pyqtSignal(float, float)
@@ -540,6 +566,7 @@ class RendererThread(QObject):
         self.zoom.connect(self.do_zoom)
         self.resize.connect(self.do_resize)
         self.change_batch_size.connect(self.do_change_batch_size)
+        self.change_timestep.connect(self.do_change_timestep)
         self.change_spp.connect(self.do_change_spp)
         self.change_transfer_function.connect(self.do_change_transfer_function)
         self.change_opacity_controlpoints.connect(self.do_change_opacities)
@@ -552,36 +579,39 @@ class RendererThread(QObject):
     def run(self):
         last_spot = 0
         current_spot = 0
-        while True:
-            current_spot = self.scene.current_order_spot
-            render_mutex.lock()
-            if(self.scene.current_order_spot == 0):
-                frame_start_time = time.time()
-            update_start_time = time.time()
-            self.scene.one_step_update()
-            if(current_spot < len(self.scene.render_order)):
-                update_time = time.time() - update_start_time
-                self.update_rate.append(update_time)
-            if(current_spot == len(self.scene.render_order) and 
-                last_spot < current_spot):
-                    frame_time = time.time() - frame_start_time
-                    self.frame_rate.append(frame_time)
-                    last_frame_time = self.frame_rate[-1]
-                    self.parent.frame_time.emit(last_frame_time)
-            img = torch_float_to_numpy_uint8(self.scene.temp_image)
-            render_mutex.unlock()
+        try:
+            while True:
+                current_spot = self.scene.current_order_spot
+                render_mutex.lock()
+                if(self.scene.current_order_spot == 0):
+                    frame_start_time = time.time()
+                update_start_time = time.time()
+                self.scene.one_step_update()
+                if(current_spot < len(self.scene.render_order)):
+                    update_time = time.time() - update_start_time
+                    self.update_rate.append(update_time)
+                if(current_spot == len(self.scene.render_order) and 
+                    last_spot < current_spot):
+                        frame_time = time.time() - frame_start_time
+                        self.frame_rate.append(frame_time)
+                        last_frame_time = self.frame_rate[-1]
+                        self.parent.frame_time.emit(last_frame_time)
+                img = torch_float_to_numpy_uint8(self.scene.temp_image)
+                render_mutex.unlock()
 
-            self.progress.emit(img)
-            self.parent.vram_use.emit(self.scene.get_mem_use())
-            
-            if(len(self.update_rate) > 20):
-                self.update_rate.pop(0)
-            if(len(self.frame_rate) > 5):
-                self.frame_rate.pop(0)
-            if(len(self.update_rate) > 0):
-                average_update_fps = 1/np.array(self.update_rate).mean()
-                self.parent.updates_per_second.emit(average_update_fps)
-            last_spot = current_spot
+                self.progress.emit(img)
+                self.parent.vram_use.emit(self.scene.get_mem_use())
+                
+                if(len(self.update_rate) > 20):
+                    self.update_rate.pop(0)
+                if(len(self.frame_rate) > 5):
+                    self.frame_rate.pop(0)
+                if(len(self.update_rate) > 0):
+                    average_update_fps = 1/np.array(self.update_rate).mean()
+                    self.parent.updates_per_second.emit(average_update_fps)
+                last_spot = current_spot
+        except Exception as e:
+            print(f"Error in render loop: {e}")
 
     def do_resize(self, w, h):
         render_mutex.lock()
@@ -696,6 +726,7 @@ class RendererThread(QObject):
         self.model.eval()
         self.full_shape = self.model.get_volume_extents()
         print(f"Min/max: {self.model.min().item():0.02f}/{self.model.max().item():0.02f}")
+        self.parent.timestep_max.emit(self.opt['n_timesteps']-1)
         self.tf.set_minmax(self.model.min(), self.model.max())  
         self.parent.status_text_update.emit(f"")   
     
@@ -705,7 +736,7 @@ class RendererThread(QObject):
         self.opt = load_options(os.path.abspath(os.path.join('SavedModels', s)))
         self.model = load_model(self.opt, self.device).to(self.device)
         self.model.eval()
-        self.do_set_timestep(0)
+        self.do_change_timestep(0)
         self.full_shape = self.model.get_volume_extents()
         self.tf.set_minmax(self.model.min(), self.model.max())        
         self.scene.model = self.model
@@ -716,11 +747,16 @@ class RendererThread(QObject):
                 ])
         #self.scene.precompute_occupancy_grid()
         print(f"Min/max: {self.model.min().item():0.02f}/{self.model.max().item():0.02f}")
+        self.parent.timestep_max.emit(self.opt['n_timesteps']-1)
         self.scene.on_setting_change()
         render_mutex.unlock()
     
-    def do_set_timestep(self, t):
+    def do_change_timestep(self, t):
+        render_mutex.lock()
+        print(f"Setting timestep to {t}")
         self.model.set_default_timestep(t)
+        self.scene.on_rotate_zoom_pan()
+        render_mutex.unlock()
     
     def do_change_data(self, s):
         render_mutex.lock()
