@@ -47,8 +47,10 @@ class RawData(torch.nn.Module):
         from Other.utility_functions import nc_to_tensor
         self.data, self.shape = nc_to_tensor(os.path.join(data_folder, data_name))
         self.data = self.data.to(device)
-        
-        
+    
+    def set_default_timestep(self, timestep:int):
+        pass
+
     def min(self):
         return self.data.min()
 

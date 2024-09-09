@@ -3,6 +3,11 @@ Improvements over APMGSRN.
 
 
 ## Installation
+Windows: supported via WSL2.
+Linux: supported.
+MacOS: not supported.
+
+Install CUDA 12.4: https://developer.nvidia.com/cuda-12-4-1-download-archive?target_os=Linux&target_arch=x86_64&Distribution=WSL-Ubuntu&target_version=2.0&target_type=runfile_local.
 `
 source tools/setup_env.sh
 `

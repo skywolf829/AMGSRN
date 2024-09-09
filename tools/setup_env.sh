@@ -28,6 +28,9 @@ if [[ ! -z "$EXTRA_INDEX_URLS" ]]; then
 fi
 pip install -e .
 
+echo "Installing nerfacc"
+pip install "nerfacc @ git+https://github.com/nerfstudio-project/nerfacc.git"
+
 echo "Installing CUDA accelerated AMGSRN"
 pip install AMGSRN/Models/AMGSRN/
 

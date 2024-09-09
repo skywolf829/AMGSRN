@@ -12,6 +12,8 @@ class TVAMGSRN(nn.Module):
         
         self.n_timesteps = opt['n_timesteps']
         self.default_timestep = 0
+        self.full_shape = opt['full_shape']
+
 
         # Create a list of AMGSRN models, one for each timestep
         self.models = nn.ModuleList([AMGSRN(opt) for _ in range(self.n_timesteps)])
@@ -27,6 +29,12 @@ class TVAMGSRN(nn.Module):
             persistent=False
         )
 
+    def min(self):
+        return self.volume_min
+
+    def max(self):
+        return self.volume_max
+
     def set_default_timestep(self, t: int):
         if(t != self.default_timestep):
             self.default_timestep = t
@@ -36,6 +44,9 @@ class TVAMGSRN(nn.Module):
             t = self.default_timestep
         return self.models[t].transformation_matrices
 
+    def get_volume_extents(self):
+        return self.full_shape
+    
     def unload_timestep(self, timestep:int):
         self.models[timestep].to('cpu')
 

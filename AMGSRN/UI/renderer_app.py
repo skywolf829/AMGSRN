@@ -654,7 +654,6 @@ class RendererThread(QObject):
         self.scene.on_tf_change()
         render_mutex.unlock()
     
-
     def do_change_batch_size(self, b):
         render_mutex.lock()
         self.batch_size = 2**b
@@ -706,6 +705,7 @@ class RendererThread(QObject):
         self.opt = load_options(os.path.abspath(os.path.join('SavedModels', s)))
         self.model = load_model(self.opt, self.device).to(self.device)
         self.model.eval()
+        self.do_set_timestep(0)
         self.full_shape = self.model.get_volume_extents()
         self.tf.set_minmax(self.model.min(), self.model.max())        
         self.scene.model = self.model
@@ -718,6 +718,9 @@ class RendererThread(QObject):
         print(f"Min/max: {self.model.min().item():0.02f}/{self.model.max().item():0.02f}")
         self.scene.on_setting_change()
         render_mutex.unlock()
+    
+    def do_set_timestep(self, t):
+        self.model.set_default_timestep(t)
     
     def do_change_data(self, s):
         render_mutex.lock()
