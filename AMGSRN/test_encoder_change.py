@@ -38,13 +38,13 @@ def forward_encode_test():
     feature_grids, translations, scales, rotations = randomize_grids(32, 2, [64, 64, 64], 3)
 
     torch.cuda.reset_peak_memory_stats()
-    x = torch.rand([2**21, 3], dtype=torch.float32, device="cuda")
+    x = torch.rand([2**23, 3], dtype=torch.float32, device="cuda")
     s = torch.exp(scales)
     r = torch.nn.functional.normalize(rotations)
     encode(x, r, s, translations, feature_grids)
     torch.cuda.synchronize()
     t0 = time()
-    for i in range(100):
+    for i in range(10):
         feats = encode(x, r, s, translations, feature_grids)
     torch.cuda.synchronize()
     t1 = time()
@@ -54,30 +54,36 @@ def forward_encode_test():
 
 
     old_encoder = AMG_encoder_old(32, 2, [64, 64, 64], 3, "default")
-    old_encoder.feature_grids = feature_grids
+    old_encoder.feature_grids = torch.nn.Parameter(feature_grids.clone(), requires_grad=True)
     transformation_matrices = create_transformation_matrices(torch.nn.functional.normalize(rotations), torch.exp(scales), translations)
-    del rotations, scales, translations
+    del rotations, scales, translations, feats, feature_grids
+    torch.cuda.empty_cache()
     old_encoder.transformation_matrices = torch.nn.parameter.Parameter(transformation_matrices, requires_grad=True)
     torch.cuda.reset_peak_memory_stats()
     old_encoder(x)
     torch.cuda.synchronize()
     t0 = time()
-    for i in range(100):
-        feats = old_encoder(x)
+    for i in range(10):
+        feats = old_encoder.forward(x)
     torch.cuda.synchronize()
     t1 = time()
     gb = torch.cuda.max_memory_allocated(device='cuda')/(1024**3)
     torch.cuda.reset_peak_memory_stats()
     print(f"Old encoder code took {t1-t0:0.02f}s with {gb:0.02f} GB VRAM")
 
+    # cleanup all
+    del old_encoder, x
+    torch.cuda.empty_cache()
+
 def backward_encode_test():
 
+    torch.cuda.empty_cache()
     print("======Backward encoding test======")
     feature_grids, translations, scales, rotations = randomize_grids(32, 2, [64, 64, 64], 3)
-
-    x = torch.rand([2**20, 3], dtype=torch.float32, device="cuda")
+    x = torch.rand([2**22, 3], dtype=torch.float32, device="cuda")
+    torch.cuda.synchronize()
     t0 = time()
-    for i in range(100):
+    for i in range(10):
         feats = encode(x, rotations, scales, translations, feature_grids)
         feats.sum().backward()
     torch.cuda.synchronize()
@@ -88,13 +94,15 @@ def backward_encode_test():
 
 
     old_encoder = AMG_encoder_old(32, 2, [64, 64, 64], 3, "default")
-    old_encoder.feature_grids = feature_grids
+    old_encoder.feature_grids = torch.nn.Parameter(feature_grids.clone(), requires_grad=True)
     transformation_matrices = create_transformation_matrices(rotations, scales, translations)
-    old_encoder.transformation_matrices = torch.nn.parameter.Parameter(transformation_matrices, requires_grad=True)
-
-    x = torch.rand([2**20, 3], device="cuda")
+    old_encoder.transformation_matrices = torch.nn.parameter.Parameter(transformation_matrices.clone(), requires_grad=True)
+    del rotations, scales, translations, feature_grids, transformation_matrices
+    torch.cuda.empty_cache()    
+    torch.cuda.reset_peak_memory_stats()
+    torch.cuda.synchronize()
     t0 = time()
-    for i in range(100):
+    for i in range(10):
         feats = old_encoder(x)
         feats.sum().backward()
     torch.cuda.synchronize()
@@ -108,9 +116,10 @@ def forward_density_test():
     print("======Forward density test======")
     feature_grids, translations, scales, rotations = randomize_grids(32, 2, [64, 64, 64], 3)
 
-    x = torch.rand([2**20, 3], dtype=torch.float32, device="cuda")
+    x = torch.rand([2**23, 3], dtype=torch.float32, device="cuda")
+    torch.cuda.synchronize()
     t0 = time()
-    for i in range(100):
+    for i in range(10):
         den = feature_density(x, rotations, scales, translations)  
     torch.cuda.synchronize()
     t1 = time()
@@ -120,13 +129,15 @@ def forward_density_test():
 
 
     old_encoder = AMG_encoder_old(32, 2, [64, 64, 64], 3, "default")
-    old_encoder.feature_grids = feature_grids
+    old_encoder.feature_grids = torch.nn.parameter.Parameter(feature_grids.clone(), requires_grad=True)
     transformation_matrices = create_transformation_matrices(rotations, scales, translations)
-    old_encoder.transformation_matrices = torch.nn.parameter.Parameter(transformation_matrices, requires_grad=True)
+    old_encoder.transformation_matrices = torch.nn.parameter.Parameter(transformation_matrices.clone(), requires_grad=True)
+    del rotations, scales, translations, feature_grids, transformation_matrices
 
-    x = torch.rand([2**20, 3], device="cuda")
+    torch.cuda.empty_cache()
+    torch.cuda.synchronize()
     t0 = time()
-    for i in range(100):
+    for i in range(10):
         den = old_encoder.feature_density(x)
     torch.cuda.synchronize()
     t1 = time()
@@ -139,9 +150,10 @@ def backward_density_test():
     print("======Backward density test======")
     feature_grids, translations, scales, rotations = randomize_grids(32, 2, [64, 64, 64], 3)
 
-    x = torch.rand([2**20, 3], dtype=torch.float32, device="cuda")
+    x = torch.rand([2**23, 3], dtype=torch.float32, device="cuda")
+    torch.cuda.synchronize()
     t0 = time()
-    for i in range(100):
+    for i in range(10):
         den = feature_density(x, rotations, scales, translations)  
         den.sum().backward()
     torch.cuda.synchronize()
@@ -152,13 +164,14 @@ def backward_density_test():
 
 
     old_encoder = AMG_encoder_old(32, 2, [64, 64, 64], 3, "default")
-    old_encoder.feature_grids = feature_grids
+    old_encoder.feature_grids = torch.nn.parameter.Parameter(feature_grids.clone(), requires_grad=True)
     transformation_matrices = create_transformation_matrices(rotations, scales, translations)
-    old_encoder.transformation_matrices = torch.nn.parameter.Parameter(transformation_matrices, requires_grad=True)
-
-    x = torch.rand([2**20, 3], device="cuda")
+    old_encoder.transformation_matrices = torch.nn.parameter.Parameter(transformation_matrices.clone(), requires_grad=True)
+    del rotations, scales, translations, feature_grids, transformation_matrices
+    torch.cuda.empty_cache()
+    torch.cuda.synchronize()
     t0 = time()
-    for i in range(100):
+    for i in range(10):
         den = old_encoder.feature_density(x)
         den.sum().backward()
     torch.cuda.synchronize()
@@ -181,31 +194,28 @@ def forward_full_test():
     model_new = AMGSRN(opt).to(opt['device'])
     
     torch.cuda.reset_peak_memory_stats()
-    x = torch.rand([2**21, 3], dtype=torch.float32, device="cuda")
+    x = torch.rand([2**22, 3], dtype=torch.float32, device="cuda")
     model_new(x)
     torch.cuda.synchronize()
     t0 = time()
-    for i in range(0):
+    for i in range(10):
         o = model_new(x)
-        #feats = encode(x, model_new.rotations, model_new.scales, model_new.translations, model_new.feature_grids)  
-        #y = model_new.decoder(feats)
     torch.cuda.synchronize()
     t1 = time()
     gb = torch.cuda.max_memory_allocated(device='cuda')/(1024**3)
     torch.cuda.reset_peak_memory_stats()
     print(f"New model code took {t1-t0:0.02f}s with {gb:0.02f} GB VRAM")
 
+    del model_new
+    torch.cuda.empty_cache()
 
     old_model : AMGSRN_old = AMGSRN_old(opt).to(opt['device'])
-    del model_new
     torch.cuda.reset_peak_memory_stats()
     old_model(x)
     torch.cuda.synchronize()
     t0 = time()
-    for i in range(0):
+    for i in range(10):
         o = old_model(x)
-        #feats = old_model.encoder(x)
-        #y = old_model.decoder(feats)
     torch.cuda.synchronize()
     t1 = time()
     gb = torch.cuda.max_memory_allocated(device='cuda')/(1024**3)
@@ -225,11 +235,11 @@ def backward_full_test():
     
     model_new = AMGSRN(opt).to(opt['device'])
     torch.cuda.reset_peak_memory_stats()
-    x = torch.rand([2**19, 3], dtype=torch.float32, device="cuda")
+    x = torch.rand([2**23, 3], dtype=torch.float32, device="cuda")
     model_new(x)
     torch.cuda.synchronize()
     t0 = time()
-    for i in range(100):
+    for i in range(10):
         o = model_new(x)
         o.sum().backward()
     torch.cuda.synchronize()
@@ -238,15 +248,14 @@ def backward_full_test():
     torch.cuda.reset_peak_memory_stats()
     print(f"New model code took {t1-t0:0.02f}s with {gb:0.02f} GB VRAM")
 
-
-    old_model = AMGSRN_old(opt).to(opt['device'])
     del model_new
+    torch.cuda.empty_cache()
+    old_model = AMGSRN_old(opt).to(opt['device'])
     torch.cuda.reset_peak_memory_stats()
-    x = torch.rand([2**19, 3], device="cuda")
     old_model(x)
     torch.cuda.synchronize()
     t0 = time()
-    for i in range(100):
+    for i in range(10):
         o = old_model(x)
         o.sum().backward()
     torch.cuda.synchronize()
@@ -255,10 +264,10 @@ def backward_full_test():
     torch.cuda.reset_peak_memory_stats()
     print(f"Old model code took {t1-t0:0.02f}s with {gb:0.02f} GB VRAM")
 
-#forward_density_test()
-forward_encode_test()
-#backward_density_test()
+#forward_encode_test()
 #backward_encode_test()
-#forward_full_test()
+#forward_density_test()
+#backward_density_test()
+forward_full_test()
 #backward_full_test()
 

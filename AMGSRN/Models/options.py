@@ -42,8 +42,8 @@ class Options():
         opt['device']                               = 'cuda:0'
         opt['data_device']                          = 'cuda:0'
 
-        opt['iterations']                           = 10000
-        opt['points_per_iteration']                 = 100000   
+        opt['iterations']                           = 30000
+        opt['points_per_iteration']                 = 2**17
         opt['lr']                                   = 0.01
         opt['transform_lr']                         = 0.001
         opt['beta_1']                               = 0.9

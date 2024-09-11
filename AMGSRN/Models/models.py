@@ -100,23 +100,22 @@ def save_model(model,opt):
     
     state_dict = model.state_dict()
     torch.save({'state_dict': state_dict}, 
-        os.path.join(path_to_save, "model.ckpt.tar"),
-        pickle_protocol=4
+        os.path.join(path_to_save, "model.ckpt")
     )
     save_options(opt, path_to_save)
 
     # Saving javascript readable model
-    with zipfile.ZipFile(os.path.join(path_to_save, "web_model.zip"), 'w') as zipf:
-        for key, tensor in state_dict.items():
-            with io.BytesIO() as array_buffer:
-                arr = tensor.cpu().numpy().astype(np.float32)
-                #print(key)
-                #print(arr)
-                array_buffer.write(arr.tobytes())
-                zipf.writestr(key+'.bin', array_buffer.getvalue())
-        with io.StringIO() as json_buffer:
-            json.dump(opt, json_buffer, sort_keys=True, indent=4)
-            zipf.writestr('options.json', json_buffer.getvalue())
+    # with zipfile.ZipFile(os.path.join(path_to_save, "web_model.zip"), 'w') as zipf:
+    #     for key, tensor in state_dict.items():
+    #         with io.BytesIO() as array_buffer:
+    #             arr = tensor.cpu().numpy().astype(np.float32)
+    #             #print(key)
+    #             #print(arr)
+    #             array_buffer.write(arr.tobytes())
+    #             zipf.writestr(key+'.bin', array_buffer.getvalue())
+    #     with io.StringIO() as json_buffer:
+    #         json.dump(opt, json_buffer, sort_keys=True, indent=4)
+    #         zipf.writestr('options.json', json_buffer.getvalue())
 
 def load_model(opt, device):
     path_to_load = os.path.join(save_folder, opt["save_name"])

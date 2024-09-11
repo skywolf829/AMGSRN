@@ -26,7 +26,7 @@ for url in indexes:
 if [[ ! -z "$EXTRA_INDEX_URLS" ]]; then
     export PIP_EXTRA_INDEX_URL="$EXTRA_INDEX_URLS"
 fi
-pip install -e .
+pip install -e .[renderer,tcnn]
 
 echo "Installing nerfacc"
 pip install "nerfacc @ git+https://github.com/nerfstudio-project/nerfacc.git"

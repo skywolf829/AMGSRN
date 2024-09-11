@@ -611,7 +611,7 @@ class RendererThread(QObject):
                     self.parent.updates_per_second.emit(average_update_fps)
                 last_spot = current_spot
         except Exception as e:
-            print(f"Error in render loop: {e}")
+            print(f"Exiting render thread.")
 
     def do_resize(self, w, h):
         render_mutex.lock()

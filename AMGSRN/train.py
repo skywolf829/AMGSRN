@@ -18,6 +18,7 @@ from vtk import vtkMultiBlockDataSet
 import numpy as np
 from torch.utils.data import DataLoader
 import glob
+import matplotlib.pyplot as plt
 import vtk
 
 project_folder_path = os.path.dirname(os.path.abspath(__file__))
@@ -26,22 +27,22 @@ data_folder = os.path.join(project_folder_path, "Data")
 output_folder = os.path.join(project_folder_path, "Output")
 save_folder = os.path.join(project_folder_path, "SavedModels")
 
-def log_to_writer(iteration, losses, writer, opt):
+def log_to_writer(iteration, metrics, writer, opt):
     with torch.no_grad():   
         print_str = f"Iteration {iteration}/{opt['iterations']}, "
-        for key in losses.keys():
-            if(losses[key] is not None):    
-                print_str = print_str + str(key) + f": {losses[key].mean().item() : 0.07f} " 
-                writer.add_scalar(str(key), losses[key].mean().item(), iteration)
+        for key in metrics.keys():
+            if(metrics[key] is not None):    
+                print_str = print_str + str(key) + f": {metrics[key] : 0.07f} " 
+                writer.add_scalar(str(key), metrics[key], iteration)
         print(print_str)
         if("cuda" in opt['device']):
             GBytes = (torch.cuda.max_memory_allocated(device=opt['device']) \
                 / (1024**3))
             writer.add_scalar('GPU memory (GB)', GBytes, iteration)
 
-def logging(writer, iteration, losses, model, opt, grid_to_sample, dataset):
+def logging(writer, iteration, metrics, model, opt, grid_to_sample, dataset):
     if(opt['log_every'] > 0 and iteration % opt['log_every'] == 0):
-        log_to_writer(iteration, losses, writer, opt)
+        log_to_writer(iteration, metrics, writer, opt)
     if(opt['log_features_every'] > 0 and \
         iteration % opt['log_features_every'] == 0):
         log_feature_grids(model, dataset, opt, iteration)
@@ -90,20 +91,13 @@ def combine_vtm_files(opt, t):
     
     # Extract iteration numbers from filenames to use as timesteps
     timesteps = [int(os.path.basename(f).split('iter')[1].split('.')[0]) for f in vtm_files]
-    
+
     # Write the PVD file using the original VTM files
     write_pvd(vtm_files, pvd_filename, timesteps)
 
 def train_step_APMGSRN(opt, iteration, batch, dataset, model, optimizer, scheduler, writer, 
                       early_stopping_data=None):
-    early_stop_reconstruction = early_stopping_data[0]
-    early_stop_grid = early_stopping_data[1]
-    early_stopping_reconstruction_losses = early_stopping_data[2]
-    early_stopping_grid_losses = early_stopping_data[3]
-    if(early_stop_reconstruction and early_stop_grid):
-        return (early_stop_reconstruction, early_stop_grid, 
-            early_stopping_reconstruction_losses,
-            early_stopping_grid_losses)
+
     optimizer[0].zero_grad()                  
     x, y = batch
     
@@ -116,12 +110,9 @@ def train_step_APMGSRN(opt, iteration, batch, dataset, model, optimizer, schedul
     loss = loss.sum(dim=1, keepdim=True)
     
     loss.mean().backward()
-    early_stopping_reconstruction_losses[iteration] = loss.mean().detach()
-    early_stop_reconstruction = optimizer[0].param_groups[0]['lr'] < opt['lr'] * 1e-2
 
     if(iteration > 500 and  # let the network learn a bit first
-        iteration < opt['iterations']*0.8 and  # stop the grid moving to adequately learn at the end
-        not early_stop_grid):
+       optimizer[1].param_groups[0]['lr'] > 1e-8):
         optimizer[1].zero_grad() 
         
         density = model.feature_density(x) 
@@ -139,29 +130,21 @@ def train_step_APMGSRN(opt, iteration, batch, dataset, model, optimizer, schedul
         density_loss.mean().backward()
         
         optimizer[1].step()
-        scheduler[1].step(density_loss.mean())   
+        scheduler[1].step()   
 
-        early_stopping_grid_losses[iteration] = density_loss.mean().detach()
-        if(iteration >= 2500):
-            early_stop_grid = optimizer[1].param_groups[0]['lr'] < opt['transform_lr'] * 0.5**5
-            if(early_stop_grid):
-                print(f"Grid has converged. Setting early stopping flag.")
 
     else:
         density_loss = None
     
     optimizer[0].step()
-    if(early_stop_grid):
-        scheduler[0].step(early_stopping_reconstruction_losses[iteration-1000:iteration].mean())   
+    scheduler[0].step()   
     
     if(opt['log_every'] != 0):
         logging(writer, iteration, 
-            {"Fitting loss": loss, 
-             "Grid loss": density_loss}, 
+            {"Fitting loss": loss.mean().detach().item(), 
+             "Grid loss": density_loss.mean().detach().item() if density_loss is not None else None,
+             "Learning rate": optimizer[0].param_groups[0]['lr']}, 
             model, opt, opt['full_shape'], dataset)
-    return (early_stop_reconstruction, early_stop_grid, 
-            early_stopping_reconstruction_losses,
-            early_stopping_grid_losses)
 
 def train_step_vanilla(opt, iteration, batch, dataset, model, optimizer, scheduler, writer,
                        early_stopping_data=None):
@@ -219,46 +202,40 @@ def train_model(model, dataset, opt):
                 )
         ]        
         scheduler = [
-            torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer[0],
-                mode="min", patience=500, threshold=1e-4, threshold_mode="rel",
-                cooldown=250,factor=0.1),
-            torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer[1], 
-                mode="min", patience=500, threshold=1e-5, threshold_mode="rel",
-                cooldown=250,factor=0.5)
-        ]      
-        early_stopping_data = (False, False,
-            torch.zeros([opt['iterations']], 
-                dtype=torch.float32, device=opt['device']),
-            torch.zeros([opt['iterations']], 
-                dtype=torch.float32, device=opt['device'])
-            )
+            torch.optim.lr_scheduler.CosineAnnealingLR(optimizer[0], T_max=opt['iterations']),
+            torch.optim.lr_scheduler.CosineAnnealingLR(optimizer[1], T_max=int(opt['iterations']/5))
+        ] 
     else:
         train_step = train_step_vanilla
         optimizer = optim.Adam(model.parameters(), lr=opt["lr"], 
             betas=[opt['beta_1'], opt['beta_2']]) 
-        scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer,
-            [opt['iterations']*(2/5), opt['iterations']*(3/5), opt['iterations']*(4/5)],
-            gamma=0.33)
-        early_stopping_data = (False,
-            torch.zeros([opt['iterations']], 
-            dtype=torch.float32, device=opt['device'])
-            )
+        scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer[0], T_max=opt['iterations'])
     
     start_time = time.time()
     for (iteration, batch) in enumerate(dataloader):
-        early_stopping_data = train_step(opt,
+        train_step(opt,
                 iteration,
                 batch,
                 dataset,
                 model,
                 optimizer,
                 scheduler,
-                writer,
-                early_stopping_data=early_stopping_data)
+                writer)
     end_time = time.time()
     sec_passed = end_time-start_time
     mins = sec_passed / 60
     
+    if writer is not None:
+        transform_params = model.get_transform_parameters()
+        all_params = torch.cat([p['params'].flatten() for p in transform_params])
+        fig, ax = plt.subplots()
+        ax.hist(all_params.detach().cpu().numpy(), bins=50)
+        ax.set_title('Histogram of Transform Parameters')
+        ax.set_xlabel('Parameter Value')
+        ax.set_ylabel('Frequency')
+        
+        writer.add_figure('Transform Parameters Histogram', fig, global_step=iteration)
+        plt.close(fig)
     print(f"Model completed training after {int(mins)}m {sec_passed%60:0.02f}s")
 
     
@@ -284,7 +261,9 @@ def train(model, dataset, opt):
         
         opt['iteration_number'] = 0
         save_model(model, opt)
-        combine_vtm_files(opt, t)
+        # Create histogram of transform parameters
+        if(opt['log_features_every'] > 0):
+            combine_vtm_files(opt, t)
 
 
 
@@ -360,6 +339,8 @@ if __name__ == '__main__':
         help='Number of points to sample per training loop update')
     parser.add_argument('--lr',default=None, type=float,
         help='Learning rate for the adam optimizer')
+    parser.add_argument('--transform_lr',default=None, type=float,
+        help='Learning rate for the transform parameters')
     parser.add_argument('--beta_1',default=None, type=float,
         help='Beta1 for the adam optimizer')
     parser.add_argument('--beta_2',default=None, type=float,

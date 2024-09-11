@@ -182,7 +182,7 @@ class AMG_encoder_old(nn.Module):
         #    / (2.0*torch.pi)**(x.shape[-1]/2)
 
         # sum the exp part to [batch,n_grids]
-        exps = torch.exp(-0.5 * \
+        exps = torch.exp(-1.0 * \
             torch.sum(
                 transformed_points.transpose(0,1)**20, 
             dim=-1))

@@ -110,12 +110,12 @@ class AMGSRN(nn.Module):
         with torch.no_grad():     
             d = "cpu"
             s = torch.ones([n_grids, n_dims], dtype=torch.float32, device = d)
-            s += torch.rand_like(s)*0.05
+            s -= torch.rand_like(s)*0.05
             s = self.inv_scale_activation(s)
             r = torch.zeros([n_grids, 4], dtype=torch.float32, device = d)
             r[:,-1] = 1.0
             t = torch.zeros([n_grids, n_dims], dtype=torch.float32, device = d)
-            t += torch.rand_like(t)*0.05
+            t += torch.rand_like(t)*0.1-0.05
             
         self._scales = torch.nn.Parameter(s,requires_grad=True)   
         self._rotations = torch.nn.Parameter(r,requires_grad=True)   
