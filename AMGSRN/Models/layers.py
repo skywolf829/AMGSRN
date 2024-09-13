@@ -23,6 +23,7 @@ class ReLULayer(nn.Module):
         self.in_features = in_features
         self.linear = nn.Linear(in_features, out_features, 
             bias=bias, dtype=dtype)
+        self.relu = nn.ReLU()
         
         self.init_weights()
     
@@ -33,7 +34,7 @@ class ReLULayer(nn.Module):
                 nn.init.zeros_(self.linear.bias)
 
     def forward(self, input):
-        return F.relu(self.linear(input))
+        return self.relu(self.linear(input))
     
 class LReLULayer(nn.Module):
     def __init__(self, in_features, out_features, 

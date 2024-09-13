@@ -98,10 +98,16 @@ def save_model(model,opt):
     folder = create_folder(save_folder, opt["save_name"])
     path_to_save = os.path.join(save_folder, folder)
     
-    state_dict = model.state_dict()
-    torch.save({'state_dict': state_dict}, 
-        os.path.join(path_to_save, "model.ckpt")
-    )
+    if(opt['model'] == "TVAMGSRN"):
+        state_dict = model.state_dict()
+        torch.save({'state_dict': state_dict}, 
+            os.path.join(path_to_save, "model.ckpt")
+        )
+    else:   
+        state_dict = model.state_dict()
+        torch.save({'state_dict': state_dict}, 
+            os.path.join(path_to_save, "model.ckpt")
+        )
     save_options(opt, path_to_save)
 
     # Saving javascript readable model
@@ -127,7 +133,7 @@ def load_model(opt, device):
         tcnn_installed = False
 
     if(not opt['ensemble']):
-        ckpt = torch.load(os.path.join(path_to_load, 'model.ckpt.tar'), 
+        ckpt = torch.load(os.path.join(path_to_load, 'model.ckpt'), 
             map_location = device, weights_only=False)   
 
         if('decoder.params' in ckpt['state_dict']):
@@ -165,8 +171,8 @@ def create_model(opt):
         elif(opt['model'] == "APMGSRN" or opt['model'] == "AMGSRN"):
             from Models.AMGSRN import AMGSRN
             return AMGSRN(opt)
-        elif(opt['model'] == "APMGSRN_old" or opt['model'] == "AMGSRN_old"):
-            from Models.AMGSRN_old import AMGSRN_old
+        elif(opt['model'] == "APMGSRN_pytorch" or opt['model'] == "AMGSRN_pytorch"):
+            from AMGSRN.Models.AMGSRN_pytorch import AMGSRN_old
             return AMGSRN_old(opt)
         elif(opt['model'] == "NGP"):
             from Models.NGP import NGP

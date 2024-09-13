@@ -9,6 +9,8 @@ import torch
 import numpy as np
 import torch.nn.functional as F
 import time
+import torch.quantization
+from torch.quantization import QuantStub, DeQuantStub
 
 project_folder_path = os.path.dirname(os.path.abspath(__file__))
 project_folder_path = os.path.join(project_folder_path, "..")
@@ -117,7 +119,7 @@ def test_psnr(model, dataset, opt):
         y = 10*torch.log10(MSE)
         y = 20.0 * torch.log10(data_max-data_min) - y
     
-    print(f"PSNR: {y : 0.03f}")
+    #print(f"PSNR: {y : 0.03f}")
     return y, SSE, MSE, data.numel()
 
 def test_grid_influence(model, opt):
@@ -198,11 +200,12 @@ def test_psnr_chunked(model, dataset, opt):
                     print(f"Chunk {z_ind},{z_ind_end},{y_ind},{y_ind_end},{x_ind},{x_ind_end} SSE: {data.sum()}")
         
         MSE = SSE / (full_shape[0]*full_shape[1]*full_shape[2])
-        print(f"MSE: {MSE}, shape {full_shape}")
+        #print(f"MSE: {MSE}, shape {full_shape}")
         y = 10 * torch.log10(MSE)
         y = 20.0 * torch.log10(data_max-data_min) - y
-    print(f"Data min/max: {data_min}/{data_max}")
-    print(f"PSNR: {y.item() : 0.03f}")
+    #print(f"Data min/max: {data_min}/{data_max}")
+    #print(f"PSNR: {y.item() : 0.03f}")
+    return y.item()
 
 def error_volume(model, dataset, opt):
     
@@ -265,7 +268,6 @@ def test_throughput(model, opt):
         torch.cuda.synchronize()
         t0 = time.time()
         for i in range(num_forward):
-            input_data.random_()
             model(input_data)
 
         torch.cuda.synchronize()
@@ -273,6 +275,27 @@ def test_throughput(model, opt):
     passed_time = t1 - t0
     points_queried = batch * num_forward
     print(f"Time for {num_forward} passes with batch size {batch}: {passed_time}")
+    print(f"Throughput: {points_queried/passed_time} points per second")
+    GBytes = (torch.cuda.max_memory_allocated(device=opt['device']) \
+                / (1024**3))
+    print(f"{GBytes : 0.02f}GB of memory used during test.")
+
+    torch.cuda.empty_cache()
+    torch.cuda.reset_accumulated_memory_stats()
+    torch.cuda.reset_peak_memory_stats()
+
+    input_data :torch.Tensor = torch.rand([batch, 3], device=opt['device'], dtype=torch.float32)
+    with torch.no_grad(), torch.autocast(device_type='cuda', dtype=torch.float16):
+        torch.cuda.synchronize()
+        t0 = time.time()
+        for i in range(num_forward):
+            model(input_data)
+
+        torch.cuda.synchronize()
+        t1 = time.time()
+    passed_time = t1 - t0
+    points_queried = batch * num_forward
+    print(f"Time for {num_forward} passes with batch size {batch} and autocast: {passed_time}")
     print(f"Throughput: {points_queried/passed_time} points per second")
     GBytes = (torch.cuda.max_memory_allocated(device=opt['device']) \
                 / (1024**3))
@@ -352,6 +375,218 @@ def feature_locations(model, opt):
         
         print(f"Largest/smallest transformed points: {transformed_points.min()} {transformed_points.max()}")
     
+def quantize_model(model, dataset, opt):
+    """ Fuse together convolutions/linear layers and ReLU """
+    opt['data_device'] = "cpu"
+    opt['device'] = "cpu"
+    model = model.to("cpu")
+    # list all modules in the model
+    q_model = load_model(opt, "cpu")
+    q_model = q_model.to("cpu")
+    q_model.train(False)
+    q_model.eval()
+    q_model.init_quant()
+    torch.quantization.fuse_modules(model, [['decoder.0.linear', 'decoder.0.relu'], 
+                                    ['decoder.1.linear', 'decoder.1.relu']], inplace=True)
+    # test psnr
+    dataset = Dataset(opt)
+    psnr, SSE, MSE, numel = test_psnr(q_model, dataset, opt)
+    print(f"PSNR fused: {psnr : 0.03f}")
+    # save and get model size
+    torch.save(q_model.state_dict(), os.path.join(output_folder, "fused_model.pth"))
+    model_size = os.path.getsize(os.path.join(output_folder, "fused_model.pth")) / (1024**2)
+    print(f"Model size post fusing: {model_size : 0.02f} MB")
+    
+    q_model.qconfig = torch.quantization.default_qconfig
+    torch.quantization.prepare(q_model, inplace=True)
+    q_model(torch.rand([2**17, 3], dtype=torch.float32, device="cpu")*2-1)
+    torch.quantization.convert(q_model, inplace=True)
+    torch.save(q_model.state_dict(), os.path.join(output_folder, "quantized_model.pth"))
+    model_size = os.path.getsize(os.path.join(output_folder, "quantized_model.pth")) / (1024**2)
+    print(f"Model size post quantization: {model_size : 0.02f} MB")
+
+    # post quantization psnr
+    psnr, SSE, MSE, numel = test_psnr(q_model, dataset, opt)
+    print(f"PSNR quantized: {psnr : 0.03f}")
+
+    # print original model size
+    torch.save(model.state_dict(), os.path.join(output_folder, "original_model.pth"))
+    original_model_size = os.path.getsize(os.path.join(output_folder, "original_model.pth")) / (1024**2)
+    print(f"Original model size: {original_model_size : 0.02f} MB")
+
+def convert_to_trt(model, opt):
+    """ Fuse together convolutions/linear layers and ReLU """
+    torch.onnx.export(model, 
+                      torch.rand([2**17, 3], 
+                                 dtype=torch.float32, 
+                                 device=opt['device']), 
+                                 os.path.join(save_folder, opt['save_name'], "model.onnx"),
+                    input_names=['input'],
+                    output_names=['output'],
+                    dynamic_axes={'input' : {0 : 'batch_size'},
+                                  'output' : {0 : 'batch_size'}},
+                    opset_version=20)
+    #Check onnx
+    import onnx
+    onnx_model = onnx.load(os.path.join(save_folder, opt['save_name'], "model.onnx"))
+    onnx.checker.check_model(onnx_model)
+    print(onnx.helper.printable_graph(onnx_model.graph))
+    import tensorrt as trt
+    logger = trt.Logger(trt.Logger.WARNING)
+    builder = trt.Builder(logger)
+    config = builder.create_builder_config()
+    network = builder.create_network(1 << int(trt.NetworkDefinitionCreationFlag.EXPLICIT_BATCH))
+    parser = trt.OnnxParser(network, logger)
+    with open(os.path.join(save_folder, opt['save_name'], "model.onnx"), 'rb') as model:
+        if not parser.parse(model.read()):
+            for error in range(parser.num_errors):
+                print(parser.get_error(error))
+            raise ValueError("Failed to parse ONNX file")
+    config.max_workspace_size = 1 << 32  # 1GB
+    engine = builder.build_engine(network, config)
+    if engine is None:
+        raise ValueError("Failed to build TensorRT engine")
+    with open(os.path.join(save_folder, opt['save_name'], "model.trt"), 'wb') as f:
+        f.write(engine.serialize())
+
+def convert_to_torchscript(model, opt):
+    with torch.no_grad():
+        input_tensor = torch.rand([2**21, 3], dtype=torch.float32, device="cuda")*2-1
+        rand_tensor = torch.rand([2**21, 3], dtype=torch.float32, device="cuda")*2-1
+        # traced_model = torch.jit.trace(model, input_tensor)
+        
+        # for i in range(10):
+        #     traced_model(input_tensor)
+        # g = torch.cuda.CUDAGraph()
+        # with torch.cuda.graph(g):
+        #     output = traced_model(input_tensor)
+        
+        # def run_inference(new_input):
+        #     input_tensor.copy_(new_input)
+        #     g.replay()
+        #     return output.clone()
+        
+        # 
+        # result = run_inference(rand_tensor)
+        # result_og = model(rand_tensor)
+        # print(f"Difference with traced graph: {torch.mean(torch.abs(result-result_og)) : 0.05f}")
+
+        # #autocasted model difference
+        # with torch.autocast(device_type='cuda', dtype=torch.float16):   
+        #     result_autocast = model(rand_tensor)
+        #     print(f"Difference with autocast float16: {torch.mean(torch.abs(result_autocast-result_og)) : 0.05f}")
+
+        
+        # # timing test for cuda graph
+        # import time
+        # times = []
+        # for i in range(100):
+        #     torch.cuda.synchronize()
+        #     t0 = time.time()
+        #     result = run_inference(rand_tensor)
+        #     torch.cuda.synchronize()
+        #     t1 = time.time()
+        #     times.append(t1-t0)
+        # print(f"Mean time for cuda graph: {sum(times) / len(times) : 0.05f} seconds")
+
+        # # just the torchscript
+        # times = []
+        # for i in range(100):
+        #     torch.cuda.synchronize()
+        #     t0 = time.time()
+        #     result = traced_model(rand_tensor)
+        #     torch.cuda.synchronize()
+        #     t1 = time.time()
+        #     times.append(t1-t0)
+        # print(f"Mean time for torchscript: {sum(times) / len(times) : 0.05f} seconds")
+
+
+        # # just the torchscript
+        # times = []
+        # traced_model = torch.jit.optimize_for_inference(traced_model)
+        # for i in range(100):
+        #     torch.cuda.synchronize()
+        #     t0 = time.time()
+        #     result = traced_model(rand_tensor)
+        #     torch.cuda.synchronize()
+        #     t1 = time.time()
+        #     times.append(t1-t0)
+        # print(f"Mean time for torchscript optimize_for_inference: {sum(times) / len(times) : 0.05f} seconds")
+
+
+        # # autocast model
+        # times = []
+        # with torch.autocast(device_type='cuda', dtype=torch.float16):
+        #     for i in range(100):
+        #         torch.cuda.synchronize()
+        #         t0 = time.time()
+        #         result = traced_model(rand_tensor)
+        #         torch.cuda.synchronize()
+        #         t1 = time.time()
+        #         times.append(t1-t0)
+        # print(f"Mean time for autocast torchscript: {sum(times) / len(times) : 0.05f} seconds")
+
+        # now test model
+        times = []
+        for i in range(100):
+            torch.cuda.synchronize()
+            t0 = time.time()
+            result = model(rand_tensor)
+            torch.cuda.synchronize()
+            t1 = time.time()
+            times.append(t1-t0)
+        print(f"Mean time for model: {sum(times) / len(times) : 0.05f} seconds")
+
+        # compiled model
+        times = []
+        with torch.autocast(device_type='cuda', dtype=torch.float16), torch.inference_mode():
+            for i in range(100):
+                torch.cuda.synchronize()
+                t0 = time.time()
+                result = model(rand_tensor)
+                torch.cuda.synchronize()
+                t1 = time.time()
+                times.append(t1-t0)
+        print(f"Mean time for amp+inference model: {sum(times) / len(times) : 0.05f} seconds")
+    
+def half_precision(model, opt):
+    with torch.no_grad():
+        input_tensor = torch.rand([2**21, 3], dtype=torch.float32, device="cuda")*2-1
+        
+        times = []
+        for i in range(100):
+            torch.cuda.synchronize()
+            t0 = time.time()
+            result = model(input_tensor)
+            torch.cuda.synchronize()
+            t1 = time.time()
+            times.append(t1-t0)
+        print(f"Mean time for normal model: {sum(times) / len(times) : 0.05f} seconds")
+
+        # amp model
+        times = []
+        with torch.autocast(device_type='cuda', dtype=torch.float16):
+            for i in range(100):
+                torch.cuda.synchronize()
+                t0 = time.time()
+                result = model(input_tensor)
+                torch.cuda.synchronize()
+                t1 = time.time()
+                times.append(t1-t0)
+        print(f"Mean time for amp model: {sum(times) / len(times) : 0.05f} seconds")
+
+        model = model.half()
+        input_tensor = input_tensor.half()
+        times = []
+        for i in range(100):
+            torch.cuda.synchronize()
+            t0 = time.time()
+            result = model(input_tensor)
+            torch.cuda.synchronize()
+            t1 = time.time()
+            times.append(t1-t0)
+        print(f"Mean time for half precision model: {sum(times) / len(times) : 0.05f} seconds")
+
 def perform_tests(model, dataset, tests, opt, timestep):
     if("reconstruction" in tests):
         model_reconstruction_chunked(model, opt, timestep),
@@ -364,13 +599,24 @@ def perform_tests(model, dataset, tests, opt, timestep):
     if("feature_density" in tests):
         feature_density(model, opt)
     if("psnr" in tests):
-        test_psnr_chunked(model, dataset, opt)
+        p = test_psnr_chunked(model, dataset, opt)
     if("histogram" in tests):
         data_hist(model, opt)
     if("throughput" in tests):
         test_throughput(model, opt)
     if("grid_influence" in tests):
         test_grid_influence(model, opt)
+    if("quantize" in tests):
+        quantize_model(model, dataset, opt)
+    if("torchscript" in tests):
+        convert_to_torchscript(model, opt)
+    if("trt" in tests):
+        convert_to_trt(model, opt)  
+    if("half_precision" in tests):
+        half_precision(model, opt)
+
+    if("psnr" in tests):
+        return p
     
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Evaluate a model on some tests')
@@ -383,6 +629,8 @@ if __name__ == '__main__':
     parser.add_argument('--data_device',default=None,type=str,
                         help="Device to load data to")
     args = vars(parser.parse_args())
+    torch.backends.cudnn.benchmark = True
+    torch.backends.cudnn.allow_tf32 = True
 
     project_folder_path = os.path.dirname(os.path.abspath(__file__))
     project_folder_path = os.path.join(project_folder_path, "..")
@@ -403,18 +651,26 @@ if __name__ == '__main__':
     dataset = Dataset(opt)
     
     # Perform tests
+    psnrs = []
+    print(opt['n_timesteps'])
     for t in range(opt['n_timesteps']):
         if opt['n_timesteps'] > 1:
             print(f"========= Timestep {t} ==========")
         model.set_default_timestep(t)
         dataset.set_default_timestep(t)
         dataset.load_timestep(t)
-        perform_tests(model, dataset, tests_to_run, opt, timestep=t)
+        p = perform_tests(model, dataset, tests_to_run, opt, timestep=t)
+        if(p is not None):
+            psnrs.append(p)
         dataset.unload_timestep(t)
         model.unload_timestep(t)
         print()
     
+    if(len(psnrs) > 0):
+        print(f"PSNRs: {psnrs}")
+        print(f"Mean PSNR: {sum(psnrs) / len(psnrs) : 0.03f}")
         
+
     
         
 

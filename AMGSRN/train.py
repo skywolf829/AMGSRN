@@ -95,7 +95,7 @@ def combine_vtm_files(opt, t):
     # Write the PVD file using the original VTM files
     write_pvd(vtm_files, pvd_filename, timesteps)
 
-def train_step_APMGSRN(opt, iteration, batch, dataset, model, optimizer, scheduler, writer, 
+def train_step_APMGSRN(opt, iteration, batch, dataset, model, optimizer, scheduler, writer, scaler,
                       early_stopping_data=None):
 
     optimizer[0].zero_grad()                  
@@ -104,39 +104,40 @@ def train_step_APMGSRN(opt, iteration, batch, dataset, model, optimizer, schedul
     x = x.to(opt['device'])
     y = y.to(opt['device'])
       
-    model_output = model.forward(x)
+    with torch.autocast(device_type='cuda', dtype=torch.float16):
+        model_output = model.forward(x)
+        loss = F.mse_loss(model_output, y, reduction='none')
+        loss = loss.sum(dim=1, keepdim=True)
     
-    loss = F.mse_loss(model_output, y, reduction='none')
-    loss = loss.sum(dim=1, keepdim=True)
-    
-    loss.mean().backward()
+    scaler.scale(loss.mean()).backward()
 
     if(iteration > 500 and  # let the network learn a bit first
        optimizer[1].param_groups[0]['lr'] > 1e-8):
         optimizer[1].zero_grad() 
         
-        density = model.feature_density(x) 
+        with torch.autocast(device_type='cuda', dtype=torch.float16):
+            density = model.feature_density(x) 
+            
+            density /= density.sum().detach()
+            target = torch.exp(torch.log(density+1e-16) * \
+                (loss.mean()/(loss+1e-16)))
+            target /= target.sum()
+            
+            density_loss = F.kl_div(
+               torch.log(density+1e-16), 
+               torch.log(target.detach()+1e-16), reduction='none', 
+                log_target=True)
         
-        density /= density.sum().detach()
-        target = torch.exp(torch.log(density+1e-16) * \
-            (loss.mean()/(loss+1e-16)))
-        target /= target.sum()
+        scaler.scale(density_loss.mean()).backward()
         
-        density_loss = F.kl_div(
-           torch.log(density+1e-16), 
-           torch.log(target.detach()+1e-16), reduction='none', 
-            log_target=True)
-        
-        density_loss.mean().backward()
-        
-        optimizer[1].step()
+        scaler.step(optimizer[1])
         scheduler[1].step()   
-
 
     else:
         density_loss = None
     
-    optimizer[0].step()
+    scaler.step(optimizer[0])
+    scaler.update()
     scheduler[0].step()   
     
     if(opt['log_every'] != 0):
@@ -146,7 +147,7 @@ def train_step_APMGSRN(opt, iteration, batch, dataset, model, optimizer, schedul
              "Learning rate": optimizer[0].param_groups[0]['lr']}, 
             model, opt, opt['full_shape'], dataset)
 
-def train_step_vanilla(opt, iteration, batch, dataset, model, optimizer, scheduler, writer,
+def train_step_vanilla(opt, iteration, batch, dataset, model, optimizer, scheduler, writer, scaler,
                        early_stopping_data=None):
     opt['iteration_number'] = iteration
     optimizer.zero_grad()
@@ -155,11 +156,14 @@ def train_step_vanilla(opt, iteration, batch, dataset, model, optimizer, schedul
     x = x.to(opt['device'])
     y = y.to(opt['device'])
     
-    model_output = model(x)
-    loss = F.mse_loss(model_output, y, reduction='none')
-    loss.mean().backward()                   
+    with torch.autocast(device_type='cuda', dtype=torch.float16):
+        model_output = model(x)
+        loss = F.mse_loss(model_output, y, reduction='none')
+    
+    scaler.scale(loss.mean()).backward()                   
 
-    optimizer.step()
+    scaler.step(optimizer)
+    scaler.update()
     scheduler.step()   
     
     logging(writer, iteration, 
@@ -209,7 +213,9 @@ def train_model(model, dataset, opt):
         train_step = train_step_vanilla
         optimizer = optim.Adam(model.parameters(), lr=opt["lr"], 
             betas=[opt['beta_1'], opt['beta_2']]) 
-        scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer[0], T_max=opt['iterations'])
+        scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=opt['iterations'])
+    
+    scaler = torch.cuda.amp.GradScaler()
     
     start_time = time.time()
     for (iteration, batch) in enumerate(dataloader):
@@ -220,7 +226,8 @@ def train_model(model, dataset, opt):
                 model,
                 optimizer,
                 scheduler,
-                writer)
+                writer,
+                scaler)
     end_time = time.time()
     sec_passed = end_time-start_time
     mins = sec_passed / 60

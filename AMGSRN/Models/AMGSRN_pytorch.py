@@ -42,7 +42,6 @@ class AMG_encoder_old(nn.Module):
         else:
             self.randomize_grids()
 
-
     def init_grids_large(self):  
         with torch.no_grad():     
             d = self.feature_grids.device
@@ -116,17 +115,34 @@ class AMG_encoder_old(nn.Module):
         returns: local coordinates in a shape [n_grids, batch, n_dims]
         '''
                 
+        transformed_points = torch.matmul(self.transformation_matrices[:,0:3,0:3], 
+                            x.transpose(0, 1)).transpose(1, 2)
+        transformed_points = transformed_points + self.transformation_matrices[:,0:3,-1].reshape(self.feature_grids.shape[0],1,-1)
+        return transformed_points
+    
+    def transform_old(self, x):
+        '''
+        Transforms global coordinates x to local coordinates within
+        each feature grid, where feature grids are assumed to be on
+        the boundary of [-1, 1]^n_dims in their local coordinate system.
+        Scales the grid by a factor to match the gaussian shape
+        (see feature_density_gaussian()). Assumes S*R*T order
+        
+        x: Input coordinates with shape [batch, n_dims]
+        returns: local coordinates in a shape [n_grids, batch, n_dims]
+        '''
+                
         # x starts [batch,n_dims], this changes it to [n_grids,batch,n_dims+1]
         # by appending 1 to the xy(z(t)) and repeating it n_grids times
         
         batch : int = x.shape[0]
         dims : int = x.shape[1]
         ones = torch.ones([batch, 1], 
-            device=x.device,
-            dtype=torch.float32)
+           device=x.device,
+           dtype=torch.float32)
             
         x = torch.cat([x, ones], dim=1)
-        #x = x.unsqueeze(0)
+        x = x.unsqueeze(0)
         #x = x.repeat(self.feature_grids.shape[0], 1, 1)
         
         # BMM will result in [n_grids,n_dims+1,n_dims+1] x [n_grids,n_dims+1,batch]
@@ -135,7 +151,7 @@ class AMG_encoder_old(nn.Module):
         #transformed_points = torch.bmm(self.transformation_matrices, 
         #                    x.transpose(1, 2)).transpose(1, 2)
         transformed_points = torch.matmul(self.transformation_matrices, 
-                            x.transpose(0, 1)).transpose(1, 2)
+                            x.transpose(1, 2)).transpose(1, 2)
         transformed_points = transformed_points[...,0:dims]
         
         # return [n_grids,batch,n_dims]
@@ -200,10 +216,7 @@ class AMG_encoder_old(nn.Module):
     def forward_pre_transformed(self, x):
         
         # Reshape to proper grid sampling size
-        grids : int = x.shape[0]
-        batch : int = x.shape[1]
-        dims : int = x.shape[2]        
-        x = x.reshape(grids, 1, 1, batch, dims)
+        x = x[:,None,None,:,:]
         
         
         # Sample the grids at the batch of transformed point locations
@@ -211,7 +224,7 @@ class AMG_encoder_old(nn.Module):
         feats = F.grid_sample(self.feature_grids,
             x.detach() if self.training else x,
             mode='bilinear', align_corners=True,
-            padding_mode="zeros").flatten(0, dims).permute(1,0)
+            padding_mode="zeros").flatten(0, 3).permute(1,0)
         
         return feats
     
@@ -305,7 +318,9 @@ class AMGSRN_old(nn.Module):
             persistent=False
         )
 
+        self.q = False
     
+
     def set_default_timestep(self, timestep:int):
         pass
     def prepare_timestep(self, timestep:int):
@@ -339,19 +354,15 @@ class AMGSRN_old(nn.Module):
     def feature_density_pre_transformed(self, x):
         return self.encoder.feature_density_pre_transformed(x)
 
-    @torch.jit.export
     def feature_density(self, x):
         return self.encoder.feature_density(x)
 
-    @torch.jit.export
     def transform(self, x):
         return self.encoder.transform(x)
     
-    @torch.jit.export
     def inverse_transform(self, x):
         return self.encoder.inverse_transform(x)
     
-    @torch.jit.export
     def grad_at(self, x):
         x.requires_grad_(True)
         y = self(x)
@@ -378,4 +389,5 @@ class AMGSRN_old(nn.Module):
 
     def forward(self, x):
         x_t = self.encoder.transform(x)
-        return self.forward_pre_transformed(x_t)   
+        return self.forward_pre_transformed(x_t)
+        

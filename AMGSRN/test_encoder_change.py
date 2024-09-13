@@ -1,5 +1,5 @@
 from AMG_Encoder import encode, create_transformation_matrices, feature_density
-from AMGSRN.Models.AMGSRN_old import AMG_encoder_old, AMGSRN_old
+from AMGSRN.Models.AMGSRN_pytorch import AMG_encoder_old, AMGSRN_old
 from AMGSRN.Models.AMGSRN import AMGSRN
 from AMGSRN.Models.options import Options
 import torch
@@ -44,8 +44,10 @@ def forward_encode_test():
     encode(x, r, s, translations, feature_grids)
     torch.cuda.synchronize()
     t0 = time()
-    for i in range(10):
-        feats = encode(x, r, s, translations, feature_grids)
+    
+    with torch.autocast(device_type='cuda', enabled=True):
+        for i in range(10):
+            feats = encode(x, r, s, translations, feature_grids)
     torch.cuda.synchronize()
     t1 = time()
     gb = torch.cuda.max_memory_allocated(device='cuda')/(1024**3)
@@ -63,8 +65,10 @@ def forward_encode_test():
     old_encoder(x)
     torch.cuda.synchronize()
     t0 = time()
-    for i in range(10):
-        feats = old_encoder.forward(x)
+    
+    with torch.autocast(device_type='cuda', enabled=True):
+        for i in range(10):
+            feats = old_encoder.forward(x)
     torch.cuda.synchronize()
     t1 = time()
     gb = torch.cuda.max_memory_allocated(device='cuda')/(1024**3)
@@ -119,8 +123,9 @@ def forward_density_test():
     x = torch.rand([2**23, 3], dtype=torch.float32, device="cuda")
     torch.cuda.synchronize()
     t0 = time()
-    for i in range(10):
-        den = feature_density(x, rotations, scales, translations)  
+    with torch.autocast(device_type='cuda', enabled=True):
+        for i in range(10):
+            den = feature_density(x, rotations, scales, translations)  
     torch.cuda.synchronize()
     t1 = time()
     gb = torch.cuda.max_memory_allocated(device='cuda')/(1024**3)
@@ -137,8 +142,9 @@ def forward_density_test():
     torch.cuda.empty_cache()
     torch.cuda.synchronize()
     t0 = time()
-    for i in range(10):
-        den = old_encoder.feature_density(x)
+    with torch.autocast(device_type='cuda', enabled=True):
+        for i in range(10):
+            den = old_encoder.feature_density(x)
     torch.cuda.synchronize()
     t1 = time()
     gb = torch.cuda.max_memory_allocated(device='cuda')/(1024**3)
@@ -186,7 +192,7 @@ def forward_full_test():
     opt = Options.get_default()
     opt['n_grids'] = 32
     opt['n_features'] = 2
-    opt['feature_grid_shape'] = "64,64,64"
+    opt['feature_grid_shape'] = "32,32,32"
     opt['data_min']=0.0
     opt['data_max'] = 1.0
     opt['device'] = "cuda"
@@ -194,12 +200,13 @@ def forward_full_test():
     model_new = AMGSRN(opt).to(opt['device'])
     
     torch.cuda.reset_peak_memory_stats()
-    x = torch.rand([2**22, 3], dtype=torch.float32, device="cuda")
+    x = torch.rand([2**23, 3], dtype=torch.float32, device="cuda")
     model_new(x)
-    torch.cuda.synchronize()
-    t0 = time()
-    for i in range(10):
-        o = model_new(x)
+    with torch.no_grad(), torch.autocast(device_type=opt['device']):
+        torch.cuda.synchronize()
+        t0 = time()
+        for i in range(100):
+            o = model_new(x)
     torch.cuda.synchronize()
     t1 = time()
     gb = torch.cuda.max_memory_allocated(device='cuda')/(1024**3)
@@ -212,10 +219,11 @@ def forward_full_test():
     old_model : AMGSRN_old = AMGSRN_old(opt).to(opt['device'])
     torch.cuda.reset_peak_memory_stats()
     old_model(x)
-    torch.cuda.synchronize()
-    t0 = time()
-    for i in range(10):
-        o = old_model(x)
+    with torch.no_grad(), torch.autocast(device_type=opt['device']):
+        torch.cuda.synchronize()
+        t0 = time()
+        for i in range(100):
+            o = old_model(x)
     torch.cuda.synchronize()
     t1 = time()
     gb = torch.cuda.max_memory_allocated(device='cuda')/(1024**3)
@@ -270,4 +278,3 @@ def backward_full_test():
 #backward_density_test()
 forward_full_test()
 #backward_full_test()
-
