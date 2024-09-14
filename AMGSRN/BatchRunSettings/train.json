@@ -1,8 +1,8 @@
 [
     [ "train.py",
         {        
-            "save_name": "supernova_large_old",
-            "model": "AMGSRN_old",
+            "save_name": "supernova_large_new_kernels",
+            "model": "AMGSRN",
             "data": "supernova1327.h5",
             "n_features": 2,
             "n_grids": 32,

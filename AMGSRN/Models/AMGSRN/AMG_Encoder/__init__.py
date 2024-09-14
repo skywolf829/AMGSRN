@@ -1,8 +1,10 @@
 import torch
 from . import _C
+from torch.amp import custom_fwd, custom_bwd
 
 class CreateTransformationMatricesFunction(torch.autograd.Function):
     @staticmethod
+    @custom_fwd(device_type="cuda", cast_inputs=torch.float16)
     def forward(ctx, rotations, scales, translations):
         # Store for use in backward
         ctx.save_for_backward(rotations, scales, translations)
@@ -13,6 +15,7 @@ class CreateTransformationMatricesFunction(torch.autograd.Function):
         return result
 
     @staticmethod
+    @custom_bwd(device_type="cuda")
     def backward(ctx, grad_output):
         rotations, scales, translations = ctx.saved_tensors
 
@@ -23,6 +26,7 @@ class CreateTransformationMatricesFunction(torch.autograd.Function):
 
 class EncodeCoordinates(torch.autograd.Function):
     @staticmethod
+    @custom_fwd(device_type="cuda", cast_inputs=torch.float16)
     def forward(ctx, query_coordinates, rotations, scales, translations, feature_grids):
 
         # Assuming create_transformation_matrices is your compiled CUDA function for forward pass
@@ -36,6 +40,7 @@ class EncodeCoordinates(torch.autograd.Function):
         return feature_vectors
 
     @staticmethod
+    @custom_bwd(device_type="cuda")
     def backward(ctx, grad_output):
         query_coordinates, rotations, scales, \
             translations, feature_grids = ctx.saved_tensors
@@ -47,6 +52,7 @@ class EncodeCoordinates(torch.autograd.Function):
 
 class FeatureDensity(torch.autograd.Function):
     @staticmethod
+    @custom_fwd(device_type="cuda", cast_inputs=torch.float16)
     def forward(ctx, query_coordinates, rotations, scales, translations):
 
         # Assuming create_transformation_matrices is your compiled CUDA function for forward pass
@@ -60,6 +66,7 @@ class FeatureDensity(torch.autograd.Function):
         return density
 
     @staticmethod
+    @custom_bwd(device_type="cuda")
     def backward(ctx, grad_output):
         query_coordinates, rotations, \
             scales, translations = ctx.saved_tensors

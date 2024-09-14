@@ -18,21 +18,6 @@ __device__ __host__ inline scalar_t4<scalar_t> make_scalar_t4(scalar_t x, scalar
     return scalar_t4<scalar_t>(x, y, z, w);
 }
 
-template<>
-__device__ __host__ inline scalar_t4<float> make_scalar_t4(float x, float y, float z, float w) {
-    return scalar_t4<float>(x, y, z, w);
-}
-
-template<>
-__device__ __host__ inline scalar_t4<double> make_scalar_t4(double x, double y, double z, double w) {
-    return scalar_t4<double>(x, y, z, w);
-}
-
-// If you're using half precision:
-template<>
-__device__ __host__ inline scalar_t4<half> make_scalar_t4(half x, half y, half z, half w) {
-    return scalar_t4<half>(x, y, z, w);
-}
 
 template<typename scalar_t>
 struct scalar_t3 {
@@ -47,21 +32,6 @@ __device__ __host__ inline scalar_t3<scalar_t> make_scalar_t3(scalar_t x, scalar
     return scalar_t3<scalar_t>(x, y, z);
 }
 
-template<>
-__device__ __host__ inline scalar_t3<float> make_scalar_t3(float x, float y, float z) {
-    return scalar_t3<float>(x, y, z);
-}
-
-template<>
-__device__ __host__ inline scalar_t3<double> make_scalar_t3(double x, double y, double z) {
-    return scalar_t3<double>(x, y, z);
-}
-
-// If you're using half precision:
-template<>
-__device__ __host__ inline scalar_t3<half> make_scalar_t3(half x, half y, half z) {
-    return scalar_t3<half>(x, y, z);
-}
 
 template<typename scalar_t>
 __device__ __forceinline__ scalar_t scalar_exp(scalar_t x);
@@ -82,9 +52,7 @@ __device__ __forceinline__ half scalar_exp<half>(half x) {
 }
 
 template<typename scalar_t>
-__device__ __forceinline__ scalar_t scalar_pow(scalar_t base, scalar_t exponent) {
-    return __pow(base, exponent);
-}
+__device__ __forceinline__ scalar_t scalar_pow(scalar_t base, scalar_t exponent);
 
 template<>
 __device__ __forceinline__ float scalar_pow<float>(float base, float exponent) {

@@ -11,10 +11,7 @@ setup(
     ext_modules=[
         CUDAExtension(
             name='AMG_Encoder._C', 
-            sources=['src/AMG_encoder.cpp', 'src/AMG_encoder_kernels.cu'],
-            extra_compile_args={'cxx': ['-O3'], 
-                                'nvcc': ['-O3', '--expt-relaxed-constexpr']
-                                }
+            sources=['src_testinggrounds/AMG_encoder.cpp', 'src_testinggrounds/AMG_encoder_kernels.cu'],
         )
     ],
     cmdclass={

@@ -95,8 +95,7 @@ def combine_vtm_files(opt, t):
     # Write the PVD file using the original VTM files
     write_pvd(vtm_files, pvd_filename, timesteps)
 
-def train_step_APMGSRN(opt, iteration, batch, dataset, model, optimizer, scheduler, writer, scaler,
-                      early_stopping_data=None):
+def train_step_APMGSRN(opt, iteration, batch, dataset, model, optimizer, scheduler, writer, scaler):
 
     optimizer[0].zero_grad()                  
     x, y = batch
@@ -104,41 +103,42 @@ def train_step_APMGSRN(opt, iteration, batch, dataset, model, optimizer, schedul
     x = x.to(opt['device'])
     y = y.to(opt['device'])
       
-    with torch.autocast(device_type='cuda', dtype=torch.float16):
+    with torch.autocast(device_type='cuda', dtype=torch.float16, enabled=False):
         model_output = model.forward(x)
         loss = F.mse_loss(model_output, y, reduction='none')
         loss = loss.sum(dim=1, keepdim=True)
-    
-    scaler.scale(loss.mean()).backward()
+    #print(model.feature_grids[0,0,0,0,0])
+    #scaler.scale(loss.mean()).backward()
+    loss.mean().backward()
 
     if(iteration > 500 and  # let the network learn a bit first
-       optimizer[1].param_groups[0]['lr'] > 1e-8):
+        optimizer[1].param_groups[0]['lr'] > 1e-8 and False):
         optimizer[1].zero_grad() 
         
-        with torch.autocast(device_type='cuda', dtype=torch.float16):
-            density = model.feature_density(x) 
-            
-            density /= density.sum().detach()
-            target = torch.exp(torch.log(density+1e-16) * \
-                (loss.mean()/(loss+1e-16)))
-            target /= target.sum()
-            
-            density_loss = F.kl_div(
-               torch.log(density+1e-16), 
-               torch.log(target.detach()+1e-16), reduction='none', 
-                log_target=True)
+        #with torch.autocast(device_type='cuda', dtype=torch.float16, enabled=False):
+        density = model.feature_density(x) 
+        density /= density.sum().detach()
+        target = torch.exp(torch.log(density+1e-16) * \
+            (loss.mean()/(loss+1e-16)))
+        target /= target.sum()
         
-        scaler.scale(density_loss.mean()).backward()
+        density_loss = F.kl_div(
+            torch.log(density+1e-16), 
+            torch.log(target.detach()+1e-16), reduction='none', 
+            log_target=True)
         
-        scaler.step(optimizer[1])
+        #scaler.scale(density_loss.mean()).backward()
+        
+        #scaler.step(optimizer[1])
         scheduler[1].step()   
 
     else:
         density_loss = None
-    
-    scaler.step(optimizer[0])
-    scaler.update()
+    optimizer[0].step()
+    #scaler.step(optimizer[0])
+    #scaler.update()
     scheduler[0].step()   
+    torch.cuda.empty_cache()
     
     if(opt['log_every'] != 0):
         logging(writer, iteration, 
@@ -215,7 +215,7 @@ def train_model(model, dataset, opt):
             betas=[opt['beta_1'], opt['beta_2']]) 
         scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=opt['iterations'])
     
-    scaler = torch.cuda.amp.GradScaler()
+    scaler = torch.amp.GradScaler()
     
     start_time = time.time()
     for (iteration, batch) in enumerate(dataloader):

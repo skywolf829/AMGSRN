@@ -202,7 +202,7 @@ def forward_full_test():
     torch.cuda.reset_peak_memory_stats()
     x = torch.rand([2**23, 3], dtype=torch.float32, device="cuda")
     model_new(x)
-    with torch.no_grad(), torch.autocast(device_type=opt['device']):
+    with torch.no_grad(), torch.autocast(device_type=opt['device'], dtype=torch.float16, enabled=True):
         torch.cuda.synchronize()
         t0 = time()
         for i in range(100):
@@ -219,7 +219,7 @@ def forward_full_test():
     old_model : AMGSRN_old = AMGSRN_old(opt).to(opt['device'])
     torch.cuda.reset_peak_memory_stats()
     old_model(x)
-    with torch.no_grad(), torch.autocast(device_type=opt['device']):
+    with torch.no_grad(), torch.autocast(device_type=opt['device'], dtype=torch.float16, enabled=True):
         torch.cuda.synchronize()
         t0 = time()
         for i in range(100):
