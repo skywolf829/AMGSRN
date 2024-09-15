@@ -107,7 +107,6 @@ def train_step_APMGSRN(opt, iteration, batch, dataset, model, optimizer, schedul
         model_output = model.forward(x)
         loss = F.mse_loss(model_output, y, reduction='none')
         loss = loss.sum(dim=1)
-    #print(model.feature_grids[0,0,0,0,0])
     scaler.scale(loss.mean()).backward()
     #loss.mean().backward()
 

@@ -168,10 +168,14 @@ def create_model(opt):
         if(opt['model'] == "fVSRN"):
             from Models.fVSRN import fVSRN_NGP
             return fVSRN_NGP(opt)
-        elif(opt['model'] == "APMGSRN" or opt['model'] == "AMGSRN"):
+        elif(opt['model'] == "APMGSRN" or opt['model'] == "AMGSRN" \
+             or opt['model'] == "APMGSRN_cuda" or opt['model'] == "AMGSRN_cuda"):
             from Models.AMGSRN import AMGSRN
             return AMGSRN(opt)
-        elif(opt['model'] == "APMGSRN_pytorch" or opt['model'] == "AMGSRN_pytorch"):
+        elif(opt['model'] == "APMGSRN_pytorch" or \
+             opt['model'] == "AMGSRN_pytorch" or \
+             opt['model'] == "AMGSRN_old" or \
+             opt['model'] == "APMGSRN_old"):
             from AMGSRN.Models.AMGSRN_pytorch import AMGSRN_old
             return AMGSRN_old(opt)
         elif(opt['model'] == "NGP"):

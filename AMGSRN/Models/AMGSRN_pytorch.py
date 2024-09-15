@@ -205,7 +205,7 @@ class AMG_encoder_old(nn.Module):
         # Another similar solution, may or may not be more efficient gradient computation 
         #exps = 1 / (1 + torch.sum(local_positions**20,dim=-1))
         
-        result = torch.sum(coeffs * exps, dim=-1, keepdim=True)
+        result = torch.sum(coeffs * exps, dim=-1)
         return result
     
     def feature_density(self, x):

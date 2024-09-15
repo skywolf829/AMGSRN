@@ -1,7 +1,7 @@
 [
     [ "train.py",
         {        
-            "save_name": "supernova_new_noamp",
+            "save_name": "supernova_cuda_amp",
             "model": "AMGSRN",
             "data": "supernova1327.h5",
             "n_features": 2,
@@ -16,8 +16,8 @@
     }],
     [ "train.py",
         {        
-            "save_name": "supernova_old_noamp",
-            "model": "AMGSRN_old",
+            "save_name": "supernova_pytorch_amp",
+            "model": "AMGSRN_pytorch",
             "data": "supernova1327.h5",
             "n_features": 2,
             "n_grids": 32,
