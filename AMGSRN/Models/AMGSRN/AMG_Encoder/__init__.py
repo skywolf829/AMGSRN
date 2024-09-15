@@ -52,7 +52,7 @@ class EncodeCoordinates(torch.autograd.Function):
 
 class FeatureDensity(torch.autograd.Function):
     @staticmethod
-    @custom_fwd(device_type="cuda", cast_inputs=torch.float16)
+    @custom_fwd(device_type="cuda") # This one doesn't benefit from float16, actually hurts performance
     def forward(ctx, query_coordinates, rotations, scales, translations):
 
         # Assuming create_transformation_matrices is your compiled CUDA function for forward pass

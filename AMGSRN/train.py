@@ -106,37 +106,37 @@ def train_step_APMGSRN(opt, iteration, batch, dataset, model, optimizer, schedul
     with torch.autocast(device_type='cuda', dtype=torch.float16, enabled=False):
         model_output = model.forward(x)
         loss = F.mse_loss(model_output, y, reduction='none')
-        loss = loss.sum(dim=1, keepdim=True)
+        loss = loss.sum(dim=1)
     #print(model.feature_grids[0,0,0,0,0])
-    #scaler.scale(loss.mean()).backward()
-    loss.mean().backward()
+    scaler.scale(loss.mean()).backward()
+    #loss.mean().backward()
 
     if(iteration > 500 and  # let the network learn a bit first
-        optimizer[1].param_groups[0]['lr'] > 1e-8 and False):
+        optimizer[1].param_groups[0]['lr'] > 1e-8):
         optimizer[1].zero_grad() 
         
-        #with torch.autocast(device_type='cuda', dtype=torch.float16, enabled=False):
-        density = model.feature_density(x) 
-        density /= density.sum().detach()
-        target = torch.exp(torch.log(density+1e-16) * \
-            (loss.mean()/(loss+1e-16)))
-        target /= target.sum()
+        with torch.autocast(device_type='cuda', dtype=torch.float16, enabled=False):
+            density = model.feature_density(x)
+            density /= density.sum().detach()
+            target = torch.exp(torch.log(density+1e-16) * \
+                (loss.mean()/(loss+1e-16)))
+            target /= target.sum()
+            
+            density_loss = F.kl_div(
+                torch.log(density+1e-16), 
+                torch.log(target.detach()+1e-16), reduction='none', 
+                log_target=True)
         
-        density_loss = F.kl_div(
-            torch.log(density+1e-16), 
-            torch.log(target.detach()+1e-16), reduction='none', 
-            log_target=True)
+        scaler.scale(density_loss.mean()).backward()
         
-        #scaler.scale(density_loss.mean()).backward()
-        
-        #scaler.step(optimizer[1])
+        scaler.step(optimizer[1])
         scheduler[1].step()   
 
     else:
         density_loss = None
-    optimizer[0].step()
-    #scaler.step(optimizer[0])
-    #scaler.update()
+    #optimizer[0].step()
+    scaler.step(optimizer[0])
+    scaler.update()
     scheduler[0].step()   
     torch.cuda.empty_cache()
     

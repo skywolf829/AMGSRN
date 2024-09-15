@@ -1,88 +1,14 @@
 #include "AMG_encoder.h"
 #include "cuda_runtime.h"
 #include "device_launch_parameters.h"
-#include <type_traits>
-#include <cuda_fp16.h>
 
 #define THREADS_PER_BLOCK 256
-template<typename scalar_t>
-struct scalar_t4 {
-    scalar_t x, y, z, w;
-    
-    __device__ __host__ scalar_t4() : x(0), y(0), z(0), w(0) {}
-    __device__ __host__ scalar_t4(scalar_t x_, scalar_t y_, scalar_t z_, scalar_t w_) : x(x_), y(y_), z(z_), w(w_) {}
-};
 
-template<typename scalar_t>
-__device__ __host__ inline scalar_t4<scalar_t> make_scalar_t4(scalar_t x, scalar_t y, scalar_t z, scalar_t w) {
-    return scalar_t4<scalar_t>(x, y, z, w);
-}
-
-
-template<typename scalar_t>
-struct scalar_t3 {
-    scalar_t x, y, z;
-    
-    __device__ __host__ scalar_t3() : x(0), y(0), z(0) {}
-    __device__ __host__ scalar_t3(scalar_t x_, scalar_t y_, scalar_t z_) : x(x_), y(y_), z(z_) {}
-};
-
-template<typename scalar_t>
-__device__ __host__ inline scalar_t3<scalar_t> make_scalar_t3(scalar_t x, scalar_t y, scalar_t z) {
-    return scalar_t3<scalar_t>(x, y, z);
-}
-
-
-template<typename scalar_t>
-__device__ __forceinline__ scalar_t scalar_exp(scalar_t x);
-
-template<>
-__device__ __forceinline__ float scalar_exp<float>(float x) {
-    return __expf(x);
-}
-
-template<>
-__device__ __forceinline__ double scalar_exp<double>(double x) {
-    return exp(x);
-}
-
-template<>
-__device__ __forceinline__ half scalar_exp<half>(half x) {
-    return hexp(x);
-}
-
-template<typename scalar_t>
-__device__ __forceinline__ scalar_t scalar_pow(scalar_t base, scalar_t exponent);
-
-template<>
-__device__ __forceinline__ float scalar_pow<float>(float base, float exponent) {
-    return __powf(base, exponent);
-}
-
-template<>
-__device__ __forceinline__ double scalar_pow<double>(double base, double exponent) {
-    return pow(base, exponent);
-}
-
-template<>
-__device__ __forceinline__ half scalar_pow<half>(half base, half exponent) {
-    // Convert to float for more accurate calculation
-    float base_f = __half2float(base);
-    float exponent_f = __half2float(exponent);
-    
-    // Perform pow operation in float
-    float result_f = __powf(base_f, exponent_f);
-    
-    // Convert back to half
-    return __float2half(result_f);
-}
-
-template<typename scalar_t>
-__device__ scalar_t3<scalar_t> transformPoint(
-    const scalar_t* rotationMatrix, 
-    const scalar_t* translation,
-    const scalar_t3<scalar_t> pos) {
-    scalar_t3<scalar_t> out = make_scalar_t3<scalar_t>(
+__device__ float3 transformPoint(
+    const float* rotationMatrix, 
+    const float* translation,
+    const float3 pos) {
+    float3 out = make_float3(
         rotationMatrix[0] * pos.x + rotationMatrix[1] * pos.y + rotationMatrix[2] * pos.z + translation[0],
         rotationMatrix[3] * pos.x + rotationMatrix[4] * pos.y + rotationMatrix[5] * pos.z + translation[1],
         rotationMatrix[6] * pos.x + rotationMatrix[7] * pos.y + rotationMatrix[8] * pos.z + translation[2]
@@ -90,21 +16,20 @@ __device__ scalar_t3<scalar_t> transformPoint(
     return out;
 }
 
-template <typename scalar_t>
 __device__ void trilinearInterpolate(
-    const scalar_t* grid, 
+    const float* grid, 
     const int C,
     const int D, 
     const int H,
     const int W,
-    const scalar_t3<scalar_t> point,
-    scalar_t* output) {
+    const float3 point,
+    float* output) {
 
     // Follows align_corners=True from Torch
     // Rescale from [-1, 1] to [0, W-1], etc.
-    scalar_t x = (W-1) * ((point.x+1.f)/2.f);
-    scalar_t y = (H-1) * ((point.y+1.f)/2.f);
-    scalar_t z = (D-1) * ((point.z+1.f)/2.f);
+    float x = (W-1) * ((point.x+1.f)/2.f);
+    float y = (H-1) * ((point.y+1.f)/2.f);
+    float z = (D-1) * ((point.z+1.f)/2.f);
     
     int x0 = __float2int_rd(x);
     int y0 = __float2int_rd(y);
@@ -113,23 +38,23 @@ __device__ void trilinearInterpolate(
     int y1 = y0 + 1;
     int z1 = z0 + 1;
 
-    scalar_t xd = x - x0;
-    scalar_t yd = y - y0;
-    scalar_t zd = z - z0;
+    float xd = x - x0;
+    float yd = y - y0;
+    float zd = z - z0;
 
     // Pre-compute weights
-    scalar_t w000 = (1-xd)*(1-yd)*(1-zd);
-    scalar_t w001 = xd*(1-yd)*(1-zd);
-    scalar_t w010 = (1-xd)*yd*(1-zd);
-    scalar_t w011 = xd*yd*(1-zd);
-    scalar_t w100 = (1-xd)*(1-yd)*zd;
-    scalar_t w101 = xd*(1-yd)*zd;
-    scalar_t w110 = (1-xd)*yd*zd;
-    scalar_t w111 = xd*yd*zd;
+    float w000 = (1-xd)*(1-yd)*(1-zd);
+    float w001 = xd*(1-yd)*(1-zd);
+    float w010 = (1-xd)*yd*(1-zd);
+    float w011 = xd*yd*(1-zd);
+    float w100 = (1-xd)*(1-yd)*zd;
+    float w101 = xd*(1-yd)*zd;
+    float w110 = (1-xd)*yd*zd;
+    float w111 = xd*yd*zd;
 
     // Iterate over each channel
     for(int i = 0; i < C; ++i) {
-        scalar_t result = 0.f;
+        float result = 0.f;
         int base_idx = i*D*H*W;
 
         // Use ternary operators to avoid branching
@@ -146,21 +71,20 @@ __device__ void trilinearInterpolate(
     }
 }
 
-template <typename scalar_t>
 __device__ void trilinearInterpolateBackwards(
-    scalar_t* dL_dFeatureGrids, 
+    float* dL_dFeatureGrids, 
     const int C,
     const int D, 
     const int H,
     const int W,
-    const scalar_t3<scalar_t> point,
-    const scalar_t* dL_dFeatureVector) {
+    const float3 point,
+    const float* dL_dFeatureVector) {
 
     
     // Rescale from [-1, 1] to [0, W-1], etc.
-    scalar_t x = (W-1) * ((point.x+1.f)/2.f);
-    scalar_t y = (H-1) * ((point.y+1.f)/2.f);
-    scalar_t z = (D-1) * ((point.z+1.f)/2.f);
+    float x = (W-1) * ((point.x+1.f)/2.f);
+    float y = (H-1) * ((point.y+1.f)/2.f);
+    float z = (D-1) * ((point.z+1.f)/2.f);
     
     // No clamping - return 0 if out of grid bounds.
     if(x <= -1 || y <= -1 || z <= -1 || x >= W || y >= H || z >= D){
@@ -174,9 +98,9 @@ __device__ void trilinearInterpolateBackwards(
     int z0 = floor(z);
     int z1 = z0 + 1;
 
-    scalar_t xd = x - x0;
-    scalar_t yd = y - y0;
-    scalar_t zd = z - z0;
+    float xd = x - x0;
+    float yd = y - y0;
+    float zd = z - z0;
 
     bool x0_in = (x0 != -1);
     bool x1_in = (x1 != W);
@@ -187,7 +111,7 @@ __device__ void trilinearInterpolateBackwards(
 
     // Iterate over each channel
     for(int i = 0; i < C; ++i){
-        scalar_t dL_dFeat = dL_dFeatureVector[i];
+        float dL_dFeat = dL_dFeatureVector[i];
         // Fetch the 8 grid values at corner points
         if(z0_in && y0_in && x0_in) atomicAdd(&dL_dFeatureGrids[i*D*H*W + z0*H*W + y0*W + x0], dL_dFeat*(1-xd)*(1 - yd)*(1-zd));
         if(z0_in && y0_in && x1_in) atomicAdd(&dL_dFeatureGrids[i*D*H*W + z0*H*W + y0*W + x1], dL_dFeat*xd*(1 - yd)*(1-zd));
@@ -200,7 +124,6 @@ __device__ void trilinearInterpolateBackwards(
     }
 }
 
-template <typename scalar_t>
 __global__ void encodeForwardKernel(
     const int num_points, 
     const int num_grids, 
@@ -208,29 +131,29 @@ __global__ void encodeForwardKernel(
     const int D, 
     const int H, 
     const int W,
-    const scalar_t* __restrict__ query_points, 
-    const scalar_t* __restrict__ rotation_matrices, 
-    const scalar_t* __restrict__ translations,
-    const scalar_t* __restrict__ feature_grids, 
-    scalar_t* __restrict__ output_features) {
+    const float* __restrict__ query_points, 
+    const float* __restrict__ rotation_matrices, 
+    const float* __restrict__ translations,
+    const float* __restrict__ feature_grids, 
+    float* __restrict__ output_features) {
 
     const auto point_idx = blockIdx.x * blockDim.x + threadIdx.x;
     const int grid_idx = blockIdx.y;
 
     if (grid_idx >= num_grids || point_idx >= num_points) return;
 
-    scalar_t* output_ptr = &output_features[point_idx*num_grids*features_per_grid + features_per_grid*grid_idx];
+    float* output_ptr = &output_features[point_idx*num_grids*features_per_grid + features_per_grid*grid_idx];
 
     // Load the query point into local registers
-    scalar_t3<scalar_t> point = make_scalar_t3<scalar_t>(
+    float3 point = make_float3(
         query_points[point_idx],
         query_points[num_points + point_idx],
         query_points[2 * num_points + point_idx]
     );
 
     // Load rotation matrix and translation directly from global memory
-    scalar_t rotation_matrix[9];
-    scalar_t translation[3];
+    float rotation_matrix[9];
+    float translation[3];
     for (int i = 0; i < 9; ++i) {
         rotation_matrix[i] = rotation_matrices[9*grid_idx + i];
     }
@@ -238,7 +161,7 @@ __global__ void encodeForwardKernel(
         translation[i] = translations[3*grid_idx + i];
     }
 
-    scalar_t3 point_t = transformPoint(rotation_matrix, translation, point);
+    float3 point_t = transformPoint(rotation_matrix, translation, point);
     
     // Check if the point is in the grid
     if(point_t.x >= -1 && point_t.y >= -1 && point_t.z >= -1 && point_t.x <= 1 && point_t.y <= 1 && point_t.z <= 1){
@@ -252,7 +175,6 @@ __global__ void encodeForwardKernel(
     }
 }
 
-template <typename scalar_t>
 __global__ void encodeBackwardKernel(
     const int num_points, 
     const int num_grids, 
@@ -260,21 +182,21 @@ __global__ void encodeBackwardKernel(
     const int D, 
     const int H, 
     const int W,
-    const scalar_t* __restrict__ query_points, 
-    const scalar_t* rotation_matrices, 
-    const scalar_t* translations,
-    const scalar_t* feature_grids, 
-    const scalar_t* dL_dFeatureVectors, 
-    scalar_t* dL_dFeatureGrids) {
+    const float* __restrict__ query_points, 
+    const float* rotation_matrices, 
+    const float* translations,
+    const float* feature_grids, 
+    const float* dL_dFeatureVectors, 
+    float* dL_dFeatureGrids) {
     
-    __shared__ scalar_t s_rotation_matrices[9];
-    __shared__ scalar_t s_translations[3];
+    __shared__ float s_rotation_matrices[9];
+    __shared__ float s_translations[3];
 
     auto idx = blockIdx.x * blockDim.x + threadIdx.x;
     if (idx >= num_points) return;
 
     // Grab the query point into local registers
-    scalar_t3<scalar_t> point = make_scalar_t3<scalar_t>(query_points[3 * idx], query_points[3 * idx + 1], query_points[3 * idx + 2]);
+    float3 point = make_float3(query_points[3 * idx],query_points[3 * idx + 1], query_points[3 * idx + 2]);
 
     for(auto grid_idx = 0; grid_idx < num_grids; ++grid_idx){
         if (threadIdx.x < 9) {
@@ -286,7 +208,7 @@ __global__ void encodeBackwardKernel(
         __syncthreads();
 
         // Transform the point into local space for the grid using pre-computed rotation matrix
-        scalar_t3 point_t = transformPoint(s_rotation_matrices, s_translations, point);
+        float3 point_t = transformPoint(s_rotation_matrices, s_translations, point);
         trilinearInterpolateBackwards(&dL_dFeatureGrids[grid_idx*features_per_grid*D*H*W], 
             features_per_grid, D, H, W, point_t, 
             &dL_dFeatureVectors[idx*num_grids*features_per_grid + features_per_grid*grid_idx]
@@ -294,18 +216,17 @@ __global__ void encodeBackwardKernel(
     }
 }
 
-template <typename scalar_t>
 __global__ void densityForwardKernel(
     const int num_points,
     const int num_grids,
-    const scalar_t* __restrict__ query_points,
-    const scalar_t* rotation_matrices,
-    const scalar_t* translations,
-    scalar_t* __restrict__ output_density) {
+    const float* __restrict__ query_points,
+    const float* rotation_matrices,
+    const float* translations,
+    float* __restrict__ output_density) {
 
-    extern __shared__ char sharedMemory[];
-    scalar_t* R = reinterpret_cast<scalar_t*>(sharedMemory);
-    scalar_t* T = R + num_grids*9;
+    extern __shared__ float sharedMemory[];
+    float* R = sharedMemory + 0;
+    float* T = sharedMemory + num_grids*9;
 
     __syncthreads();
     for(int i = threadIdx.x; i < num_grids*12; i+=THREADS_PER_BLOCK){
@@ -323,52 +244,49 @@ __global__ void densityForwardKernel(
     auto idx = blockIdx.x * blockDim.x + threadIdx.x;
     if (idx >= num_points) return;
 
-    scalar_t density = static_cast<scalar_t>(0.0);
-    scalar_t3<scalar_t> point = make_scalar_t3<scalar_t>(query_points[3*idx], query_points[3*idx+1], query_points[3*idx+2]);
+    float density = 0.0f;
+    float3 point = make_float3(query_points[3*idx], query_points[3*idx+1], query_points[3*idx+2]);
 
     for(int i = 0; i<num_grids; ++i){
         auto o = 9*i;
-        scalar_t3<scalar_t> point_t = transformPoint(&R[o], &T[3*i], point);
+        float3 point_t = transformPoint(&R[o], &T[3*i], point);
 
-        scalar_t det = R[o+0] * (R[o+4]*R[o+8]-R[o+5]*R[o+7]) -
-                       R[o+1] * (R[o+3]*R[o+8]-R[o+5]*R[o+6]) +
-                       R[o+2] * (R[o+3]*R[o+7]-R[o+4]*R[o+6]); 
-        scalar_t g = scalar_exp<scalar_t>(-(scalar_pow<scalar_t>(point_t.x, static_cast<scalar_t>(20)) + 
-                                            scalar_pow<scalar_t>(point_t.y, static_cast<scalar_t>(20)) + 
-                                            scalar_pow<scalar_t>(point_t.z, static_cast<scalar_t>(20))));
+        float det = R[o+0] * (R[o+4]*R[o+8]-R[o+5]*R[o+7]) -
+                   R[o+1] * (R[o+3]*R[o+8]-R[o+5]*R[o+6]) +
+                   R[o+2] * (R[o+3]*R[o+7]-R[o+4]*R[o+6]); 
+        float g = __expf(-(powf(point_t.x, 20) + powf(point_t.y, 20) + powf(point_t.z, 20)));
         density += det * g;
     }
     output_density[idx] = density;
 }
 
-template <typename scalar_t>
 __global__ void densityBackwardKernel(
     const int num_points,
     const int num_grids,
-    const scalar_t* __restrict__ query_points,
-    const scalar_t* __restrict__ rotation_matrices,
-    const scalar_t* __restrict__ translations,
-    const scalar_t* __restrict__ dL_dDensity,
-    scalar_t* dL_dRotation_matrix,
-    scalar_t* dL_dTranslations) {
+    const float* __restrict__ query_points,
+    const float* __restrict__ rotation_matrices,
+    const float* __restrict__ translations,
+    const float* __restrict__ dL_dDensity,
+    float* dL_dRotation_matrix,
+    float* dL_dTranslations) {
     
     auto idx = blockIdx.x * blockDim.x + threadIdx.x;
     
     // Shared array for the rotation matrix and translation gradients
     // Reduce total number of atomic adds by putting them here and then
     // aggregating.
-    __shared__ scalar_t shared_grads[THREADS_PER_BLOCK * 12];
-    __shared__ scalar_t shared_sum[12];
-    extern __shared__ scalar_t sharedMemory[];
-    scalar_t* R = sharedMemory + 0;
-    scalar_t* T = sharedMemory + num_grids*9;
+    __shared__ float shared_grads[THREADS_PER_BLOCK * 12];
+    __shared__ float shared_sum[12];
+    extern __shared__ float sharedMemory[];
+    float* R = sharedMemory + 0;
+    float* T = sharedMemory + num_grids*9;
 
     auto s = threadIdx.x*12;
 
-    scalar_t3<scalar_t> point;
-    scalar_t dL_dD;
+    float3 point;
+    float dL_dD;
     if(idx < num_points){
-        point = make_scalar_t3<scalar_t>(query_points[idx*3], query_points[3*idx+1], query_points[3*idx+2]);
+        point = make_float3(query_points[idx*3], query_points[3*idx+1], query_points[3*idx+2]);
         dL_dD = dL_dDensity[idx];
     }
     // Use shared memory to load all translations/rotations
@@ -385,26 +303,24 @@ __global__ void densityBackwardKernel(
     }
     __syncthreads();
 
-    // Gradients for each rotation matrix/translation
+    // Gradients for each rotaiton matrix/translation
     for(int i = 0; i<num_grids; ++i){
         auto o = i*9;
         // Only process if the threadID is within the num_points
         if (idx < num_points){
             // Manual point transformation
-            scalar_t3<scalar_t> point_t = transformPoint(&R[o], &T[3*i], point);
+            float3 point_t = transformPoint(&R[o], &T[3*i], point);
 
-            scalar_t det = R[o + 0] * (R[o + 4]*R[o + 8]-R[o + 5]*R[o + 7]) -
+            float det = R[o + 0] * (R[o + 4]*R[o + 8]-R[o + 5]*R[o + 7]) -
                     R[o + 1] * (R[o + 3]*R[o + 8]-R[o + 5]*R[o + 6]) +
                     R[o + 2] * (R[o + 3]*R[o + 7]-R[o + 4]*R[o + 6]); 
             
-            scalar_t tx19 = scalar_pow<scalar_t>(point_t.x, static_cast<scalar_t>(19));
-            scalar_t ty19 = scalar_pow<scalar_t>(point_t.y, static_cast<scalar_t>(19));
-            scalar_t tz19 = scalar_pow<scalar_t>(point_t.z, static_cast<scalar_t>(19)); 
+            float tx19 = powf(point_t.x, 19);
+            float ty19 = powf(point_t.y, 19);
+            float tz19 = powf(point_t.z, 19); 
 
-            scalar_t g = scalar_exp<scalar_t>(-(scalar_pow<scalar_t>(point_t.x, static_cast<scalar_t>(20)) + 
-                                                scalar_pow<scalar_t>(point_t.y, static_cast<scalar_t>(20)) + 
-                                                scalar_pow<scalar_t>(point_t.z, static_cast<scalar_t>(20))));
-            scalar_t det20g = static_cast<scalar_t>(-20.0) * det * g;
+            float g = __expf(-(powf(point_t.x, 20) + powf(point_t.y, 20) + powf(point_t.z, 20)));
+            float det20g = -20.f * det * g;
 
             //0-8 is rotation matrix grads, 9-12 is translation
             shared_grads[s + 0] = dL_dD*det20g * tx19 * point.x +
@@ -434,13 +350,13 @@ __global__ void densityBackwardKernel(
         
         }
         else{
-            for(int j = 0; j<12; ++j) shared_grads[s+j]=static_cast<scalar_t>(0.0);
+            for(int j = 0; j<12; ++j) shared_grads[s+j]=0.f;
         }
        
         __syncthreads();
         // Reduce shared gradient data via summing every 12th index
         if (threadIdx.x < 12) { 
-            shared_sum[threadIdx.x] = static_cast<scalar_t>(0.0);
+            shared_sum[threadIdx.x] = 0.f;
             for (int j = 0; j < THREADS_PER_BLOCK; j++) {
                 shared_sum[threadIdx.x] += shared_grads[j * 12 + threadIdx.x];
             }
@@ -456,36 +372,35 @@ __global__ void densityBackwardKernel(
     }
 }
 
-template <typename scalar_t>
 __global__ void combineTransformationsKernel(
     const int numTransforms,
-    const scalar_t4<scalar_t>* __restrict__ quaternions, 
-    const scalar_t* __restrict__ scales, 
-    const scalar_t* __restrict__ translations, 
-    scalar_t* __restrict__ output) {
+    const float4* __restrict__ quaternions, 
+    const float* __restrict__ scales, 
+    const float* __restrict__ translations, 
+    float* __restrict__ output) {
         
     auto idx = blockIdx.x * blockDim.x + threadIdx.x;
     if (idx >= numTransforms) return;
     auto o = idx * 16;
 
-    scalar_t4 q;
-    scalar_t s[3];
-    scalar_t t[3];
+    float4 q;
+    float s[3];
+    float t[3];
 
     // Load the quaternion, scale, and translation for this thread
     q = quaternions[idx];
     for (int i = 0; i < 3; ++i) s[i] = scales[idx * 3 + i];
     for (int i = 0; i < 3; ++i) t[i] = translations[idx * 3 + i];
 
-    scalar_t wx = q.x * q.w;
-    scalar_t wy = q.y * q.w;
-    scalar_t wz = q.z * q.w;
-    scalar_t xx = q.x * q.x;
-    scalar_t xy = q.x * q.y;
-    scalar_t xz = q.x * q.z;
-    scalar_t yy = q.y * q.y;
-    scalar_t yz = q.y * q.z;
-    scalar_t zz = q.z * q.z;
+    float wx = q.x * q.w;
+    float wy = q.y * q.w;
+    float wz = q.z * q.w;
+    float xx = q.x * q.x;
+    float xy = q.x * q.y;
+    float xz = q.x * q.z;
+    float yy = q.y * q.y;
+    float yz = q.y * q.z;
+    float zz = q.z * q.z;
 
     output[o + 0] = s[0] * (1.f - 2.f * (yy + zz));
     output[o + 1] = s[1] * (2.f * (xy - wz));
@@ -509,35 +424,34 @@ __global__ void combineTransformationsKernel(
 }
 
 
-template <typename scalar_t>
 __global__ void combineTransformationsKernelBackward(
     const int numTransforms,
-    const scalar_t4* __restrict__ quaternions, 
-    const scalar_t* __restrict__ scales, 
-    const scalar_t* __restrict__ translations, 
-    scalar_t4* __restrict__ dQuaternions,
-    scalar_t* __restrict__ dScales,
-    scalar_t* __restrict__ dTranslations,
-    const scalar_t* __restrict__ dOut) {
+    const float4* __restrict__ quaternions, 
+    const float* __restrict__ scales, 
+    const float* __restrict__ translations, 
+    float4* __restrict__ dQuaternions,
+    float* __restrict__ dScales,
+    float* __restrict__ dTranslations,
+    const float* __restrict__ dOut) {
 
     auto idx = blockIdx.x * blockDim.x + threadIdx.x;
     if (idx >= numTransforms) return;
 
-    scalar_t4 q;
-    scalar_t s[3];
+    float4 q;
+    float s[3];
 
     q = quaternions[idx];
     for (int i = 0; i < 3; ++i) s[i] = scales[idx * 3 + i];
 
-    scalar_t wx = q.x * q.w;
-    scalar_t wy = q.y * q.w;
-    scalar_t wz = q.z * q.w;
-    scalar_t xx = q.x * q.x;
-    scalar_t xy = q.x * q.y;
-    scalar_t xz = q.x * q.z;
-    scalar_t yy = q.y * q.y;
-    scalar_t yz = q.y * q.z;
-    scalar_t zz = q.z * q.z;
+    float wx = q.x * q.w;
+    float wy = q.y * q.w;
+    float wz = q.z * q.w;
+    float xx = q.x * q.x;
+    float xy = q.x * q.y;
+    float xz = q.x * q.z;
+    float yy = q.y * q.y;
+    float yz = q.y * q.z;
+    float zz = q.z * q.z;
 
     dScales[idx * 3 + 0] = 
         (dOut[idx * 16 + 0]*(1 - 2 * (yy + zz))) +
@@ -616,33 +530,32 @@ __global__ void quaternionScaleToRotationMatrix(
 }
 
 
-template <typename scalar_t>
 __global__ void rotationMatrixBackward(
     const int numTransforms,
-    const scalar_t4* __restrict__ quaternions, 
-    const scalar_t* __restrict__ scales, 
-    scalar_t4* __restrict__ dQuaternions,
-    scalar_t* __restrict__ dScales,
-    const scalar_t* __restrict__ dMatrix) {
+    const float4* __restrict__ quaternions, 
+    const float* __restrict__ scales, 
+    float4* __restrict__ dQuaternions,
+    float* __restrict__ dScales,
+    const float* __restrict__ dMatrix) {
 
     auto idx = blockIdx.x * blockDim.x + threadIdx.x;
     if (idx >= numTransforms) return;
     auto o = idx * 9;
 
-    scalar_t4 q = quaternions[idx];
-    scalar_t sx = scales[idx * 3];
-    scalar_t sy = scales[idx * 3 + 1];
-    scalar_t sz = scales[idx * 3 + 2];
+    float4 q = quaternions[idx];;
+    float sx = scales[idx * 3];
+    float sy = scales[idx * 3 + 1];
+    float sz = scales[idx * 3 + 2];
 
-    scalar_t wx = q.x * q.w;
-    scalar_t wy = q.y * q.w;
-    scalar_t wz = q.z * q.w;
-    scalar_t xx = q.x * q.x;
-    scalar_t xy = q.x * q.y;
-    scalar_t xz = q.x * q.z;
-    scalar_t yy = q.y * q.y;
-    scalar_t yz = q.y * q.z;
-    scalar_t zz = q.z * q.z;
+    float wx = q.x * q.w;
+    float wy = q.y * q.w;
+    float wz = q.z * q.w;
+    float xx = q.x * q.x;
+    float xy = q.x * q.y;
+    float xz = q.x * q.z;
+    float yy = q.y * q.y;
+    float yz = q.y * q.z;
+    float zz = q.z * q.z;
 
     dScales[idx * 3 + 0] = 
         (dMatrix[o + 0]*(1 - 2 * (yy + zz))) +
@@ -675,49 +588,46 @@ __global__ void rotationMatrixBackward(
 
 }
 
-template <typename scalar_t>
 void launch_create_transformation_matrices(
     const int numTransforms,
-    const scalar_t* rotations, 
-    const scalar_t* scales, 
-    const scalar_t* translations, 
-    scalar_t* out)
+    const float* rotations, 
+    const float* scales, 
+    const float* translations, 
+    float* out)
 {
     auto blocksPerGrid = (numTransforms + THREADS_PER_BLOCK - 1) / THREADS_PER_BLOCK;
     combineTransformationsKernel<<<blocksPerGrid, THREADS_PER_BLOCK>>>(
         numTransforms,
-        (scalar_t4*)rotations,
+        (float4*)rotations,
         scales, 
         translations, 
         out
     );
 }
 
-template <typename scalar_t>
 void launch_create_transformation_matrices_backward(
     const int numTransforms,
-    const scalar_t* rotations, 
-    const scalar_t* scales, 
-    const scalar_t* translations, 
-    scalar_t* dRotations, 
-    scalar_t* dScales, 
-    scalar_t* dTranslations, 
-    const scalar_t* dL_dMatrix)
+    const float* rotations, 
+    const float* scales, 
+    const float* translations, 
+    float* dRotations, 
+    float* dScales, 
+    float* dTranslations, 
+    const float* dL_dMatrix)
 {
     auto blocksPerGrid = (numTransforms + THREADS_PER_BLOCK - 1) / THREADS_PER_BLOCK;
     combineTransformationsKernelBackward<<<blocksPerGrid, THREADS_PER_BLOCK>>>(
         numTransforms,
-        (scalar_t4*)rotations,
+        (float4*)rotations,
         scales, 
         translations, 
-        (scalar_t4*)dRotations,
+        (float4*)dRotations,
         dScales, 
         dTranslations, 
         dL_dMatrix
     );
 }
 
-template <typename scalar_t>
 void launch_encode_forward(
     const int num_points,
     const int num_grids,
@@ -725,21 +635,21 @@ void launch_encode_forward(
     const int D, 
     const int H, 
     const int W,
-    const scalar_t* query_points, 
-    const scalar_t* rotations, 
-    const scalar_t* scales, 
-    const scalar_t* translations, 
-    const scalar_t* feature_grids, 
-    scalar_t* output_features)
+    const float* query_points, 
+    const float* rotations, 
+    const float* scales, 
+    const float* translations, 
+    const float* feature_grids, 
+    float* output_features)
 {
     // First, preprocess rotation matrices    
-    scalar_t* rotation_matrices;
-    cudaMalloc((void **)&rotation_matrices, num_grids*3*3*sizeof(scalar_t));
+    float* rotation_matrices;
+    cudaMalloc((void **)&rotation_matrices, num_grids*3*3*sizeof(float));
 
     auto blocksPerGrid = (num_grids + THREADS_PER_BLOCK - 1) / THREADS_PER_BLOCK;
     quaternionScaleToRotationMatrix<<<blocksPerGrid, THREADS_PER_BLOCK>>>(
         num_grids, 
-        (scalar_t4*)rotations, 
+        (float4*)rotations, 
         scales, 
         rotation_matrices
     );
@@ -753,7 +663,6 @@ void launch_encode_forward(
     cudaFree(rotation_matrices);
 }
 
-template <typename scalar_t>
 void launch_encode_backward(
     const int num_points,
     const int num_grids,
@@ -761,22 +670,22 @@ void launch_encode_backward(
     const int D, 
     const int H, 
     const int W,
-    const scalar_t* query_points, 
-    const scalar_t* rotations, 
-    const scalar_t* scales, 
-    const scalar_t* translations, 
-    const scalar_t* feature_grids, 
-    const scalar_t* dL_dFeature_vectors,
-    scalar_t* dL_dFeatureGrids)
+    const float* query_points, 
+    const float* rotations, 
+    const float* scales, 
+    const float* translations, 
+    const float* feature_grids, 
+    const float* dL_dFeature_vectors,
+    float* dL_dFeatureGrids)
 {
     // First, preprocess rotation matrices    
-    scalar_t* rotation_matrices;
-    cudaMalloc((void **)&rotation_matrices, num_grids*3*3*sizeof(scalar_t));
+    float* rotation_matrices;
+    cudaMalloc((void **)&rotation_matrices, num_grids*3*3*sizeof(float));
 
     auto blocksPerGrid = (num_grids + THREADS_PER_BLOCK - 1) / THREADS_PER_BLOCK;
     quaternionScaleToRotationMatrix<<<blocksPerGrid, THREADS_PER_BLOCK>>>(
         num_grids, 
-        (scalar_t4*)rotations, 
+        (float4*)rotations, 
         scales, 
         rotation_matrices
     );
@@ -798,30 +707,29 @@ void launch_encode_backward(
     cudaFree(rotation_matrices);
 }
 
-template <typename scalar_t>
 void launch_density_forward(
     const int num_points,
     const int num_grids,
-    const scalar_t* query_points, 
-    const scalar_t* rotations, 
-    const scalar_t* scales, 
-    const scalar_t* translations, 
-    scalar_t* output_density){
+    const float* query_points, 
+    const float* rotations, 
+    const float* scales, 
+    const float* translations, 
+    float* output_density){
 
     // First, preprocess rotation matrices    
-    scalar_t* rotation_matrices;
-    cudaMalloc((void **)&rotation_matrices, num_grids*3*3*sizeof(scalar_t));
+    float* rotation_matrices;
+    cudaMalloc((void **)&rotation_matrices, num_grids*3*3*sizeof(float));
 
     auto blocksPerGrid = (num_grids + THREADS_PER_BLOCK - 1) / THREADS_PER_BLOCK;
     quaternionScaleToRotationMatrix<<<blocksPerGrid, THREADS_PER_BLOCK>>>(
         num_grids, 
-        (scalar_t4*)rotations, 
+        (float4*)rotations, 
         scales, 
         rotation_matrices
     );
 
     blocksPerGrid = (num_points + THREADS_PER_BLOCK - 1) / THREADS_PER_BLOCK;
-    densityForwardKernel<<<blocksPerGrid, THREADS_PER_BLOCK, num_grids*12*sizeof(scalar_t)>>>(
+    densityForwardKernel<<<blocksPerGrid, THREADS_PER_BLOCK, num_grids*12*sizeof(float)>>>(
         num_points,
         num_grids,
         query_points,
@@ -831,23 +739,24 @@ void launch_density_forward(
     );
     cudaFree(rotation_matrices);
 }
-template <typename scalar_t>
+
+
 void launch_density_backward(
     const int num_points,
     const int num_grids,
-    const scalar_t* query_points, 
-    const scalar_t* rotations, 
-    const scalar_t* scales, 
-    const scalar_t* translations, 
-    const scalar_t* dL_dDensity,
-    scalar_t* dL_dRotations,
-    scalar_t* dL_dScales,
-    scalar_t* dL_dTranslations){
+    const float* query_points, 
+    const float* rotations, 
+    const float* scales, 
+    const float* translations, 
+    const float* dL_dDensity,
+    float* dL_dRotations,
+    float* dL_dScales,
+    float* dL_dTranslations){
 
     // First, preprocess rotation matrices    
-    scalar_t* rotation_matrices;
-    scalar_t* dL_dRotation_matrices;
-    size_t size = num_grids*3*3*sizeof(scalar_t);
+    float* rotation_matrices;
+    float* dL_dRotation_matrices;
+    size_t size = num_grids*3*3*sizeof(float);
     cudaMalloc((void **)&rotation_matrices, size);
     cudaMalloc((void **)&dL_dRotation_matrices, size);
     cudaMemset(dL_dRotation_matrices, 0, size);
@@ -855,13 +764,13 @@ void launch_density_backward(
     auto blocksPerGrid = (num_grids + THREADS_PER_BLOCK - 1) / THREADS_PER_BLOCK;
     quaternionScaleToRotationMatrix<<<blocksPerGrid, THREADS_PER_BLOCK>>>(
         num_grids, 
-        (scalar_t4*)rotations, 
+        (float4*)rotations, 
         scales, 
         rotation_matrices
     );
 
     blocksPerGrid = (num_points + THREADS_PER_BLOCK - 1) / THREADS_PER_BLOCK;
-    densityBackwardKernel<<<blocksPerGrid, THREADS_PER_BLOCK, num_grids*12*sizeof(scalar_t)>>>(
+    densityBackwardKernel<<<blocksPerGrid, THREADS_PER_BLOCK, num_grids*12*sizeof(float)>>>(
         num_points,
         num_grids,
         query_points,
@@ -875,9 +784,9 @@ void launch_density_backward(
     blocksPerGrid = (num_grids + THREADS_PER_BLOCK - 1) / THREADS_PER_BLOCK;
     rotationMatrixBackward<<<blocksPerGrid, THREADS_PER_BLOCK>>>(
         num_grids,
-        (scalar_t4*)rotations,
+        (float4*)rotations,
         scales,
-        (scalar_t4*)dL_dRotations,
+        (float4*)dL_dRotations,
         dL_dScales,
         dL_dRotation_matrices
     );

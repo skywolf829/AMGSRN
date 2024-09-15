@@ -45,7 +45,7 @@ def forward_encode_test():
     torch.cuda.synchronize()
     t0 = time()
     
-    with torch.autocast(device_type='cuda', enabled=True):
+    with torch.autocast(device_type='cuda', enabled=False), torch.no_grad():
         for i in range(10):
             feats = encode(x, r, s, translations, feature_grids)
     torch.cuda.synchronize()
@@ -66,7 +66,7 @@ def forward_encode_test():
     torch.cuda.synchronize()
     t0 = time()
     
-    with torch.autocast(device_type='cuda', enabled=True):
+    with torch.autocast(device_type='cuda', enabled=False), torch.no_grad():
         for i in range(10):
             feats = old_encoder.forward(x)
     torch.cuda.synchronize()
@@ -123,7 +123,7 @@ def forward_density_test():
     x = torch.rand([2**23, 3], dtype=torch.float32, device="cuda")
     torch.cuda.synchronize()
     t0 = time()
-    with torch.autocast(device_type='cuda', enabled=True):
+    with torch.autocast(device_type='cuda', enabled=True), torch.no_grad():
         for i in range(10):
             den = feature_density(x, rotations, scales, translations)  
     torch.cuda.synchronize()
@@ -142,7 +142,7 @@ def forward_density_test():
     torch.cuda.empty_cache()
     torch.cuda.synchronize()
     t0 = time()
-    with torch.autocast(device_type='cuda', enabled=True):
+    with torch.autocast(device_type='cuda', enabled=True), torch.no_grad():
         for i in range(10):
             den = old_encoder.feature_density(x)
     torch.cuda.synchronize()
@@ -202,7 +202,7 @@ def forward_full_test():
     torch.cuda.reset_peak_memory_stats()
     x = torch.rand([2**23, 3], dtype=torch.float32, device="cuda")
     model_new(x)
-    with torch.no_grad(), torch.autocast(device_type=opt['device'], dtype=torch.float16, enabled=True):
+    with torch.no_grad(), torch.autocast(device_type=opt['device'], dtype=torch.float16, enabled=False):
         torch.cuda.synchronize()
         t0 = time()
         for i in range(100):
@@ -219,7 +219,7 @@ def forward_full_test():
     old_model : AMGSRN_old = AMGSRN_old(opt).to(opt['device'])
     torch.cuda.reset_peak_memory_stats()
     old_model(x)
-    with torch.no_grad(), torch.autocast(device_type=opt['device'], dtype=torch.float16, enabled=True):
+    with torch.no_grad(), torch.autocast(device_type=opt['device'], dtype=torch.float16, enabled=False):
         torch.cuda.synchronize()
         t0 = time()
         for i in range(100):
@@ -274,7 +274,7 @@ def backward_full_test():
 
 #forward_encode_test()
 #backward_encode_test()
-#forward_density_test()
+forward_density_test()
 #backward_density_test()
-forward_full_test()
+#forward_full_test()
 #backward_full_test()
