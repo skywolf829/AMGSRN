@@ -46,6 +46,7 @@ class Options():
         opt['points_per_iteration']                 = 2**17
         opt['lr']                                   = 0.01
         opt['transform_lr']                         = 0.001
+        opt['tv_weight']                            = 0.0001
         opt['beta_1']                               = 0.9
         opt['beta_2']                               = 0.99
 
@@ -56,7 +57,9 @@ class Options():
         opt['log_image_every']                      = 0
         opt['log_image']                            = False
         opt['profile']                              = False
-
+        opt['compressor_used']                      = "none"
+        opt['save_with_compression']                = True
+        opt['save_with_compression_level']          = 0.01
         return opt
 
 def save_options(opt, save_location):

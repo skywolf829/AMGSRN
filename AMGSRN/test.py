@@ -11,6 +11,8 @@ import torch.nn.functional as F
 import time
 import torch.quantization
 from torch.quantization import QuantStub, DeQuantStub
+import subprocess
+from matplotlib import pyplot as plt
 
 project_folder_path = os.path.dirname(os.path.abspath(__file__))
 project_folder_path = os.path.join(project_folder_path, "..")
@@ -587,6 +589,300 @@ def half_precision(model, opt):
             times.append(t1-t0)
         print(f"Mean time for half precision model: {sum(times) / len(times) : 0.05f} seconds")
 
+def compression_test(model, opt):
+    model = model.to("cuda").eval()
+    dataset = Dataset(opt)
+    original_psnr = test_psnr_chunked(model, dataset, opt)
+    original_size = sum(p.numel() * p.element_size() for p in model.parameters()) / (1024 * 1024)  # Size in MB
+    print(f"Original model PSNR: {original_psnr:.2f} dB")
+    print(f"Original model size: {original_size:.2f} MB")
+
+    # Define error bounds and precisions
+    sz3_abs_error_bounds = [0.1, 0.075, 0.05, 0.025, 0.02, 0.015, 0.01, 0.0075]
+    fpzip_precisions = [12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 24, 26, 28, 32]
+
+    # Define parameter subsets
+    param_subsets = {
+        #"transform": ["_scales", "_rotations", "translations"],
+        #"network": ["feature_grids", "decoder"],
+        "feature_grids": ["feature_grids"],
+        #"decoder": ["decoder"],
+        #"all": ["_scales", "_rotations", "translations", "feature_grids", "decoder"]
+    }
+
+    results = {
+        "sz3_abs": {subset: [] for subset in param_subsets},
+        "fpzip": {subset: [] for subset in param_subsets}
+    }
+
+    with torch.no_grad():
+        for subset_name, subset in param_subsets.items():
+            print(f"Testing compression for {subset_name} parameters")
+            
+            # SZ3 ABS
+            for bound in sz3_abs_error_bounds:
+                
+                test_model = load_model(opt, "cuda")
+                test_model = test_model.to("cuda")
+                test_model.eval()
+                dataset = Dataset(opt)
+                try:
+                    compressed_size, psnr = compress_and_test_sz3(model, test_model, dataset, opt, bound, "ABS", subset)
+                    results["sz3_abs"][subset_name].append((compressed_size, psnr))
+                except Exception as e:
+                    print(f"Error in SZ3 ABS compression for {subset_name} with bound {bound}: {str(e)}")
+            
+            # FPZIP
+            for precision in fpzip_precisions:
+                test_model = load_model(opt, "cuda")
+                test_model = test_model.to("cuda")
+                test_model.eval()
+                dataset = Dataset(opt)
+                try:
+                    compressed_size, psnr = compress_and_test_fpzip(model, test_model, dataset, opt, precision, subset)
+                    results["fpzip"][subset_name].append((compressed_size, psnr))
+                except Exception as e:
+                    print(f"Error in FPZIP compression for {subset_name} with precision {precision}: {str(e)}")
+
+    # Plot results
+    fig, axs = plt.subplots(len(param_subsets.keys()), len(results.keys()), figsize=(6*len(results.keys()), 6*len(param_subsets.keys())))
+    fig.suptitle("Compression Results: PSNR vs Compressed Model Size")
+
+    # Find global min and max PSNR values
+    all_psnrs = [psnr for subsets in results.values() for data in subsets.values() for _, psnr in data]
+    all_psnrs.append(original_psnr)
+    min_psnr = 0
+    max_psnr = min(50, np.max(all_psnrs)*1.1)
+
+    # Find global min and max sizes
+    all_sizes = [size for subsets in results.values() for data in subsets.values() for size, _ in data]
+    all_sizes.append(original_size)
+    min_size = 0  # Add 10% buffer on the left
+    max_size = original_size*1.1
+
+    for i, (compressor, data) in enumerate(results.items()):
+        for j, (subset_name, subsets) in enumerate(param_subsets.items()):
+            if len(results) == 1 and len(param_subsets) == 1:
+                ax = axs
+            elif len(results) == 1:
+                ax = axs[j]
+            elif len(param_subsets) == 1:
+                ax = axs[i]
+            else:
+                ax = axs[i, j]
+            if data[subset_name]:
+                sizes, psnrs = zip(*data[subset_name])
+                ax.plot(sizes, psnrs, 'o-', label=compressor)
+                ax.plot(original_size, original_psnr, 'r*', markersize=10, label='Original Model')
+                ax.set_xlabel("Compressed Size (MB)")
+                ax.set_ylabel("PSNR (dB)")
+                ax.set_title(f"{subset_name} - {compressor.upper()}")
+                ax.legend()
+                ax.grid(True)
+                ax.set_ylim(min_psnr, max_psnr)  # Set the same y-axis limits for all plots
+                ax.set_xlim(min_size, max_size)  # Set the same x-axis limits for all plots
+            else:
+                ax.text(0.5, 0.5, "No data available", ha='center', va='center', transform=ax.transAxes)
+                ax.set_title(f"{subset_name} - {compressor.upper()}")
+
+    plt.tight_layout()
+    plt.savefig(os.path.join(save_folder, opt['save_name'], "compression.png"))
+
+    # Print results
+    for compressor, subsets in results.items():
+        print(f"\n{compressor.upper()} Results:")
+        for subset_name, data in subsets.items():
+            print(f"  {subset_name} parameters:")
+            for size, psnr in data:
+                print(f"    Compressed Size: {size:.2f} MB, PSNR: {psnr:.2f} dB")
+
+def compress_and_test_sz3(model, test_model, dataset, opt, error_bound, error_mode, param_subset):
+    params = {
+        '_scales': model._scales.cpu().detach().numpy().astype(np.float32),
+        '_rotations': model._rotations.cpu().detach().numpy().astype(np.float32),
+        'translations': model.translations.cpu().detach().numpy().astype(np.float32),
+        'feature_grids': model.feature_grids.cpu().detach().numpy().astype(np.float32),
+        'decoder': [p.cpu().detach().numpy().astype(np.float32) for p in model.decoder.parameters()]
+    }
+    
+    total_compressed_size = 0
+
+    for name in params:
+        if name in param_subset:
+            continue
+        if name in ['_scales', '_rotations', 'translations']:
+            total_compressed_size += params[name].nbytes
+        elif name == 'feature_grids':
+            total_compressed_size += params['feature_grids'].nbytes
+        elif name == 'decoder':
+            total_compressed_size += sum(p.nbytes for p in params['decoder'])
+
+    for name in param_subset:
+        if name in ['_scales', '_rotations', 'translations']:
+            param = params[name]
+            param.tofile(f"temp_{name}.raw")
+            dims = ' '.join(str(d) for d in param.shape)
+            dim_flag = f"-{len(param.shape)} {dims}"
+            
+            command = f"sz3 -f -z temp_{name}.sz -i temp_{name}.raw -o temp_{name}.sz.out -M {error_mode} {error_bound} {dim_flag}"
+            subprocess.run(command, check=True)
+            
+            compressed_size = os.path.getsize(f"temp_{name}.sz")
+            total_compressed_size += compressed_size
+            
+            decompressed = np.fromfile(f"temp_{name}.sz.out", dtype=np.float32).reshape(param.shape)
+            setattr(test_model, name, torch.nn.Parameter(torch.from_numpy(decompressed).to(model.feature_grids.device)))
+        
+        elif name == 'feature_grids':
+            for i in range(params['feature_grids'].shape[1]):
+                param = params['feature_grids'][:, i]
+                param.tofile(f"temp_feature_grids_{i}.raw")
+                dims = ' '.join(str(d) for d in param.shape)
+                dim_flag = f"-{len(param.shape)} {dims}"
+                
+                command = f"sz3 -f -z temp_feature_grids_{i}.sz -i temp_feature_grids_{i}.raw -o temp_feature_grids_{i}.sz.out -M {error_mode} {error_bound} {dim_flag}"
+                subprocess.run(command, check=True)
+                
+                compressed_size = os.path.getsize(f"temp_feature_grids_{i}.sz")
+                total_compressed_size += compressed_size
+                
+                decompressed = np.fromfile(f"temp_feature_grids_{i}.sz.out", dtype=np.float32).reshape(param.shape)
+                test_model.feature_grids[:, i] = torch.from_numpy(decompressed).to(model.feature_grids.device)
+        
+        elif name == 'decoder':
+            for i, layer_param in enumerate(params['decoder']):
+                layer_param.tofile(f"temp_decoder_{i}.raw")
+                dims = ' '.join(str(d) for d in layer_param.shape)
+                dim_flag = f"-{len(layer_param.shape)} {dims}"
+                
+                command = f"sz3 -f -z temp_decoder_{i}.sz -i temp_decoder_{i}.raw -o temp_decoder_{i}.sz.out -M {error_mode} {error_bound} {dim_flag}"
+                subprocess.run(command, check=True)
+                
+                compressed_size = os.path.getsize(f"temp_decoder_{i}.sz")
+                total_compressed_size += compressed_size
+                
+                decompressed = np.fromfile(f"temp_decoder_{i}.sz.out", dtype=np.float32).reshape(layer_param.shape)
+                list(test_model.decoder.parameters())[i].data = torch.from_numpy(decompressed).to(model.feature_grids.device)
+
+    # Clean up temporary files
+    for name in param_subset:
+        if name in ['_scales', '_rotations', 'translations']:
+            os.remove(f"temp_{name}.raw")
+            os.remove(f"temp_{name}.sz")
+            os.remove(f"temp_{name}.sz.out")
+        elif name == 'feature_grids':
+            for i in range(model.feature_grids.shape[1]):
+                os.remove(f"temp_feature_grids_{i}.raw")
+                os.remove(f"temp_feature_grids_{i}.sz")
+                os.remove(f"temp_feature_grids_{i}.sz.out")
+        elif name == 'decoder':
+            for i in range(len(params['decoder'])):
+                os.remove(f"temp_decoder_{i}.raw")
+                os.remove(f"temp_decoder_{i}.sz")
+                os.remove(f"temp_decoder_{i}.sz.out")
+
+    # Test PSNR using test_psnr_chunked
+    psnr = test_psnr_chunked(test_model, dataset, opt)
+    
+    return total_compressed_size / (1024 * 1024), psnr  # Return size in MB
+
+def compress_and_test_fpzip(model, test_model, dataset, opt, precision, param_subset):
+    params = {
+        '_scales': model._scales.detach().cpu().numpy().astype(np.float32),
+        '_rotations': model._rotations.detach().cpu().numpy().astype(np.float32),
+        'translations': model.translations.detach().cpu().numpy().astype(np.float32),
+        'feature_grids': model.feature_grids.detach().cpu().numpy().astype(np.float32),
+        'decoder': [p.cpu().detach().numpy().astype(np.float32) for p in model.decoder.parameters()]
+    }
+    
+    total_compressed_size = 0
+    
+    for name in params:
+        if name in param_subset:
+            continue
+        if name in ['_scales', '_rotations', 'translations']:
+            total_compressed_size += params[name].nbytes
+        elif name == 'feature_grids':
+            total_compressed_size += params['feature_grids'].nbytes
+        elif name == 'decoder':
+            total_compressed_size += sum(p.nbytes for p in params['decoder'])
+    
+    for name in param_subset:
+        if name in ['_scales', '_rotations', 'translations']:
+            param = params[name]
+            param.tofile(f"temp_{name}.raw")
+            dims = ' '.join(str(d) for d in param.shape)
+            dim_flag = f"-{len(param.shape)} {dims}"
+            
+            command = f"fpzip -t float -p {precision} {dim_flag} -i temp_{name}.raw -o temp_{name}.fpz"
+            subprocess.run(command, check=True)
+            
+            compressed_size = os.path.getsize(f"temp_{name}.fpz")
+            total_compressed_size += compressed_size
+            
+            command = f"fpzip -d -t float -i temp_{name}.fpz -o temp_{name}.out"
+            subprocess.run(command, check=True)
+            decompressed = np.fromfile(f"temp_{name}.out", dtype=np.float32).reshape(param.shape)
+            setattr(test_model, name, torch.nn.Parameter(torch.from_numpy(decompressed).to(model.feature_grids.device)))
+        
+        elif name == 'feature_grids':
+            for i in range(params['feature_grids'].shape[1]):
+                param = params['feature_grids'][:, i]
+                param.tofile(f"temp_feature_grids_{i}.raw")
+                dims = ' '.join(str(d) for d in param.shape)
+                dim_flag = f"-{len(param.shape)} {dims}"
+                
+                command = f"fpzip -t float -p {precision} {dim_flag} -i temp_feature_grids_{i}.raw -o temp_feature_grids_{i}.fpz"
+                subprocess.run(command, check=True)
+                
+                compressed_size = os.path.getsize(f"temp_feature_grids_{i}.fpz")
+                total_compressed_size += compressed_size
+                
+                command = f"fpzip -d -t float -i temp_feature_grids_{i}.fpz -o temp_feature_grids_{i}.out"
+                subprocess.run(command, check=True)
+                decompressed = np.fromfile(f"temp_feature_grids_{i}.out", dtype=np.float32).reshape(param.shape)
+                test_model.feature_grids[:, i] = torch.from_numpy(decompressed).to(model.feature_grids.device)
+        
+        elif name == 'decoder':
+            for i, layer_param in enumerate(params['decoder']):
+                layer_param.tofile(f"temp_decoder_{i}.raw")
+                dims = ' '.join(str(d) for d in layer_param.shape)
+                dim_flag = f"-{len(layer_param.shape)} {dims}"
+                
+                command = f"fpzip -t float -p {precision} {dim_flag} -i temp_decoder_{i}.raw -o temp_decoder_{i}.fpz"
+                subprocess.run(command, check=True)
+                
+                compressed_size = os.path.getsize(f"temp_decoder_{i}.fpz")
+                total_compressed_size += compressed_size
+                
+                command = f"fpzip -d -t float -i temp_decoder_{i}.fpz -o temp_decoder_{i}.out"
+                subprocess.run(command, check=True)
+                decompressed = np.fromfile(f"temp_decoder_{i}.out", dtype=np.float32).reshape(layer_param.shape)
+                list(test_model.decoder.parameters())[i].data = torch.from_numpy(decompressed).to(model.feature_grids.device)
+
+    # Clean up temporary files
+    for name in param_subset:
+        if name in ['_scales', '_rotations', 'translations']:
+            os.remove(f"temp_{name}.raw")
+            os.remove(f"temp_{name}.fpz")
+            os.remove(f"temp_{name}.out")
+        elif name == 'feature_grids':
+            for i in range(model.feature_grids.shape[1]):
+                os.remove(f"temp_feature_grids_{i}.raw")
+                os.remove(f"temp_feature_grids_{i}.fpz")
+                os.remove(f"temp_feature_grids_{i}.out")
+        elif name == 'decoder':
+            for i in range(len(params['decoder'])):
+                os.remove(f"temp_decoder_{i}.raw")
+                os.remove(f"temp_decoder_{i}.fpz")
+                os.remove(f"temp_decoder_{i}.out")
+
+    # Test PSNR using test_psnr_chunked
+    psnr = test_psnr_chunked(test_model, dataset, opt)
+    
+    return total_compressed_size / (1024 * 1024), psnr  # Return size in MB
+
+
 def perform_tests(model, dataset, tests, opt, timestep):
     if("reconstruction" in tests):
         model_reconstruction_chunked(model, opt, timestep),
@@ -614,6 +910,8 @@ def perform_tests(model, dataset, tests, opt, timestep):
         convert_to_trt(model, opt)  
     if("half_precision" in tests):
         half_precision(model, opt)
+    if("compression" in tests):
+        compression_test(model, opt)
 
     if("psnr" in tests):
         return p

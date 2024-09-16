@@ -107,14 +107,25 @@ def train_step_APMGSRN(opt, iteration, batch, dataset, model, optimizer, schedul
         model_output = model.forward(x)
         loss = F.mse_loss(model_output, y, reduction='none')
         loss = loss.sum(dim=1)
+        if(opt['tv_weight'] > 0):   
+            # Calculate total variation loss for feature grids
+            tv_loss = opt['tv_weight'] * (
+                torch.pow(model.feature_grids[:, :, :, :, 1:] - model.feature_grids[:, :, :, :, :-1], 2).mean() + \
+                torch.pow(model.feature_grids[:, :, :, 1:, :] - model.feature_grids[:, :, :, :-1, :], 2).mean() + \
+                torch.pow(model.feature_grids[:, :, 1:, :, :] - model.feature_grids[:, :, :-1, :, :], 2).mean() + \
+                torch.pow(model.feature_grids[1:, :, :, :, :] - model.feature_grids[:-1, :, :, :, :], 2).mean())
+            # Add TV loss to the main loss with a weighting factor
+        else:
+            tv_loss = None
     scaler.scale(loss.mean()).backward()
-    #loss.mean().backward()
+    if(tv_loss is not None):
+        scaler.scale(tv_loss.mean()).backward()
 
     if(iteration > 500 and  # let the network learn a bit first
         optimizer[1].param_groups[0]['lr'] > 1e-8):
         optimizer[1].zero_grad() 
         
-        with torch.autocast(device_type='cuda', dtype=torch.float16, enabled=False):
+        with torch.autocast(device_type='cuda', dtype=torch.float16, enabled=True):
             density = model.feature_density(x)
             density /= density.sum().detach()
             target = torch.exp(torch.log(density+1e-16) * \
@@ -143,6 +154,7 @@ def train_step_APMGSRN(opt, iteration, batch, dataset, model, optimizer, schedul
         logging(writer, iteration, 
             {"Fitting loss": loss.mean().detach().item(), 
              "Grid loss": density_loss.mean().detach().item() if density_loss is not None else None,
+             "TV loss": tv_loss.mean().detach().item() if tv_loss is not None else None,
              "Learning rate": optimizer[0].param_groups[0]['lr']}, 
             model, opt, opt['full_shape'], dataset)
 
@@ -347,6 +359,8 @@ if __name__ == '__main__':
         help='Learning rate for the adam optimizer')
     parser.add_argument('--transform_lr',default=None, type=float,
         help='Learning rate for the transform parameters')
+    parser.add_argument('--tv_weight',default=None, type=float,
+        help='Weight for the TV loss')
     parser.add_argument('--beta_1',default=None, type=float,
         help='Beta1 for the adam optimizer')
     parser.add_argument('--beta_2',default=None, type=float,
@@ -366,6 +380,10 @@ if __name__ == '__main__':
         help='Model to load to start training from')
     parser.add_argument('--log_image',default=None, type=str2bool,
         help='Whether or not to log an image. Slows down training.')
+    parser.add_argument('--save_with_compression',default=None, type=str2bool,
+        help='Use compression?')
+    parser.add_argument('--save_with_compression_level',default=None, type=float,
+        help='Compression level for SZ3, ABS mode only.')
 
 
     args = vars(parser.parse_args())
