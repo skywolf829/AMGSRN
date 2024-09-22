@@ -363,6 +363,10 @@ class MainWindow(QMainWindow):
         print(f"Updating timestep max to {val}")
         self.timestep_slider.setMaximum(val)
     
+    def set_timestep(self, val):
+        self.timestep_slider.setValue(val)
+        self.timestep_selector_label.setText(f"Timestep: {val}")
+
     def update_updates(self, val):
         self.update_framerate_label.setText(f"Update framerate: {val:0.02f} fps")
     
@@ -463,7 +467,7 @@ class MainWindow(QMainWindow):
     
     def change_tf_range(self):
         dmin, dmax = [int(v) for v in self.tf_rescale_slider.value()]
-        self.render_worker.tf_rescale.emit(dmin/1000, dmax/1000)
+        self.render_worker.tf_rescale.emit(dmin/1000.0, dmax/1000.0)
      
     def mouseReleased(self, event):
         if event.type() == QEvent.MouseButtonRelease:
@@ -612,6 +616,7 @@ class RendererThread(QObject):
                 last_spot = current_spot
         except Exception as e:
             print(f"Exiting render thread.")
+            raise e
 
     def do_resize(self, w, h):
         render_mutex.lock()
@@ -660,6 +665,7 @@ class RendererThread(QObject):
 
     def do_tf_rescale(self, dmin, dmax):
         render_mutex.lock()
+        print(f"Setting tf minmax to {dmin} {dmax}")
         self.tf.set_mapping_minmax(dmin, dmax)
         self.scene.on_rotate_zoom_pan()
         render_mutex.unlock()
@@ -726,11 +732,15 @@ class RendererThread(QObject):
         self.model.eval()
         self.full_shape = self.model.get_volume_extents()
         print(f"Min/max: {self.model.min().item():0.02f}/{self.model.max().item():0.02f}")
+        self.parent.set_timestep(0)
         self.parent.timestep_max.emit(self.opt['n_timesteps']-1)
         self.tf.set_minmax(self.model.min(), self.model.max())  
         self.parent.status_text_update.emit(f"")   
     
     def do_change_model(self, s):
+        print("Resetting timestep to 0")
+        self.parent.set_timestep(0)
+
         render_mutex.lock()
         print(f"Loading model {s}")
         self.opt = load_options(os.path.abspath(os.path.join('SavedModels', s)))
@@ -745,9 +755,9 @@ class RendererThread(QObject):
         self.scene.model = self.model
         print(f"Setting aabb")
         self.scene.set_aabb([ 
-                self.full_shape[2]-1,
+                self.full_shape[0]-1,
                 self.full_shape[1]-1,
-                self.full_shape[0]-1
+                self.full_shape[2]-1
                 ])
         #self.scene.precompute_occupancy_grid()
         print(f"Min/max: {self.model.min().item():0.02f}/{self.model.max().item():0.02f}")

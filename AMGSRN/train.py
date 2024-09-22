@@ -296,10 +296,11 @@ def train(model, dataset, opt):
         model.unload_timestep(t)
         
         opt['iteration_number'] = 0
-        save_model(model, opt)
         # Create histogram of transform parameters
         if(opt['log_features_every'] > 0):
             combine_vtm_files(opt, t)
+    
+    save_model(model, opt)
 
 
 

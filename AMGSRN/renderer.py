@@ -211,17 +211,20 @@ class TransferFunction():
         self.mapping_minmax = torch.tensor([min, max], device=self.device)
         
     def remap_value(self, values):
-        new_min = -(self.mapping_minmax[0])
-        new_max = 2 - self.mapping_minmax[1]
-        values = values * (new_max - new_min)
-        values += new_min
-        return values
+        range = self.max_value - self.min_value
+        new_min = self.min_value + range*self.mapping_minmax[0]
+        new_max = self.min_value + range*self.mapping_minmax[1]
+        values_new = values - new_min
+        values_new /= (new_max - new_min)
+        return values_new
         
     def remap_value_inplace(self, values):
-        new_min = -(self.mapping_minmax[0])
-        new_max = 2 - self.mapping_minmax[1]
-        values *= (new_max - new_min)
-        values += new_min
+        range = self.max_value - self.min_value
+        new_min = self.min_value + range*self.mapping_minmax[0]
+        new_max = self.min_value + range*self.mapping_minmax[1]
+        values -= new_min
+        values /= (new_max - new_min)
+        return values
     
     def update_opacities(self, opacity_control_points, opacity_values):
         self.opacity_control_points = torch.tensor(opacity_control_points,
@@ -232,35 +235,9 @@ class TransferFunction():
                                     device=self.device)
         self.precompute_opacity_map()
         
-    def color_at_value(self, value:torch.Tensor):
-        value_device = value.device
-        value = value.to(self.device)
-        value_ind = (
-            (value[:,0] - self.min_value) / (self.max_value - self.min_value) *
-            (self.mapping_minmax[1] - self.mapping_minmax[0]) + self.mapping_minmax[0]
-        )
-        value_ind *= self.num_dict_entries
-        value_ind = value_ind.long()
-        value_ind.clamp_(0,self.num_dict_entries-1)
-        return torch.index_select(self.precomputed_color_map, dim=0, index=value_ind).to(value_device)
-    
-    def opacity_at_value(self, value:torch.Tensor):
-        value_device = value.device
-        value = value.to(self.device)
-        value_ind = (
-            (value[:,0] - self.min_value) / (self.max_value - self.min_value) *
-            (self.mapping_minmax[1] - self.mapping_minmax[0]) + self.mapping_minmax[0]
-        )
-        value_ind *= self.num_dict_entries
-        value_ind = value_ind.type(torch.long)
-        value_ind.clamp_(0,self.num_dict_entries-1)
-        return torch.index_select(self.precomputed_opacity_map, dim=0, index=value_ind).to(value_device)
-
     def color_opacity_at_value(self, value:torch.Tensor):
         value_device = value.device
         value = value.to(self.device)
-        value -= self.min_value
-        value /= (self.max_value-self.min_value)
         self.remap_value_inplace(value)
         value *= self.num_dict_entries
         value = value.type(torch.long)
@@ -271,7 +248,7 @@ class TransferFunction():
     def color_opacity_at_value_inplace(self, value:torch.Tensor, rgbs, alphas, start_ind):
         value_device = value.device
         value = value.to(self.device)
-        value_ind = self.remap_value((value[:,0] - self.min_value) / (self.max_value - self.min_value))
+        value_ind = self.remap_value(value)
         value_ind *= self.num_dict_entries
         value_ind = value_ind.type(torch.long)
         value_ind.clamp_(0,self.num_dict_entries-1)
@@ -417,7 +394,7 @@ class Scene(torch.nn.Module):
         self.model = model
         self.device : str = device
         self.data_device : str = data_device
-        self.swapxyz = False
+        self.swapxyz = True
         if(self.swapxyz):
             self.scene_aabb = \
                 torch.tensor([0.0, 0.0, 0.0, 
@@ -800,6 +777,8 @@ if __name__ == '__main__':
                         help="The colormap file to use for visualization.")
     parser.add_argument('--raw_data',default="false",type=str2bool,
                         help="Render raw data instead of neural rendering")
+    parser.add_argument('--timestep',default=0,type=int,
+                        help="Which timestep to render")
     # rendering args ********* ->
     parser.add_argument(
         '--azi',
@@ -866,6 +845,7 @@ if __name__ == '__main__':
         model = load_model(opt, args['data_device'])
         print(opt['data_device'])
         model = model.to(opt['data_device'])
+        model.set_default_timestep(args['timestep'])
         full_shape = opt['full_shape']
         model.eval()
     else:

@@ -70,5 +70,9 @@
         "xtr1common": "cpp",
         "xtree": "cpp",
         "algorithm": "cpp"
-    }
+    },
+    "python.analysis.include": [
+        "AMGSRN/**",
+        "tools/**"
+    ]
 }
