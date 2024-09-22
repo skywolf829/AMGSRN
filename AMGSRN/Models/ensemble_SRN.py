@@ -88,7 +88,12 @@ class Ensemble_SRN(nn.Module):
         for i in range(1, len(self.models)):
             val = torch.max(val, self.models[i].max())
         return val
-    
+    def set_default_timestep(self, timestep:int):
+        pass
+    def prepare_timestep(self, timestep:int):
+        pass
+    def unload_timestep(self, timestep:int):
+        self.to('cpu')
     def get_volume_extents(self):
         return self.opt['full_shape']
     

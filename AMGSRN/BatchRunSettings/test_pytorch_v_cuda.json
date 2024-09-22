@@ -1,0 +1,42 @@
+[    
+    [ "test.py",
+        {        
+        "load_from": "asteroid_small_pytorch",
+        "tests": "psnr"
+    }],
+    [ "test.py",
+        {        
+        "load_from": "asteroid_small_cuda",
+        "tests": "psnr"
+    }],
+    [ "test.py",
+        {        
+        "load_from": "chameleon_small_pytorch",
+        "tests": "psnr"
+    }],
+    [ "test.py",
+        {        
+        "load_from": "chameleon_small_cuda",
+        "tests": "psnr"
+    }],
+    [ "test.py",
+        {        
+        "load_from": "supernova_small_pytorch",
+        "tests": "psnr"
+    }],
+    [ "test.py",
+        {        
+        "load_from": "supernova_small_cuda",
+        "tests": "psnr"
+    }],
+    [ "test.py",
+        {        
+        "load_from": "woodbranch_small_pytorch",
+        "tests": "psnr"
+    }],
+    [ "test.py",
+        {        
+        "load_from": "woodbranch_small_cuda",
+        "tests": "psnr"
+    }]
+]

@@ -117,9 +117,25 @@ def train_step_APMGSRN(opt, iteration, batch, dataset, model, optimizer, schedul
             # Add TV loss to the main loss with a weighting factor
         else:
             tv_loss = None
+        if(opt['model'] == "TVAMGSRN" and opt['grid_diff_weight'] > 0 and opt['save_grid_diffs'] and model.default_timestep > 0):
+            grid_diff_loss = opt['grid_diff_weight'] * \
+                torch.abs(model.models[model.default_timestep-1].feature_grids.detach() - \
+                         model.feature_grids).mean() 
+        else:
+            grid_diff_loss = None
+        
+        if(opt['l1_regularization'] > 0):
+            l1_loss = opt['l1_regularization'] * model.feature_grids.abs().mean()
+        else:
+            l1_loss = None
+
     scaler.scale(loss.mean()).backward()
     if(tv_loss is not None):
         scaler.scale(tv_loss.mean()).backward()
+    if(grid_diff_loss is not None):
+        scaler.scale(grid_diff_loss.mean()).backward()
+    if(l1_loss is not None):
+        scaler.scale(l1_loss.mean()).backward()
 
     if(iteration > 500 and  # let the network learn a bit first
         optimizer[1].param_groups[0]['lr'] > 1e-8):
@@ -155,6 +171,8 @@ def train_step_APMGSRN(opt, iteration, batch, dataset, model, optimizer, schedul
             {"Fitting loss": loss.mean().detach().item(), 
              "Grid loss": density_loss.mean().detach().item() if density_loss is not None else None,
              "TV loss": tv_loss.mean().detach().item() if tv_loss is not None else None,
+             "Grid diff loss": grid_diff_loss.mean().detach().item() if grid_diff_loss is not None else None,
+             "L1 loss": l1_loss.mean().detach().item() if l1_loss is not None else None,
              "Learning rate": optimizer[0].param_groups[0]['lr']}, 
             model, opt, opt['full_shape'], dataset)
 
@@ -361,6 +379,10 @@ if __name__ == '__main__':
         help='Learning rate for the transform parameters')
     parser.add_argument('--tv_weight',default=None, type=float,
         help='Weight for the TV loss')
+    parser.add_argument('--grid_diff_weight',default=None, type=float,
+        help='Weight for the grid diff loss')
+    parser.add_argument('--l1_regularization',default=None, type=float,
+        help='Weight for the L1 regularization')
     parser.add_argument('--beta_1',default=None, type=float,
         help='Beta1 for the adam optimizer')
     parser.add_argument('--beta_2',default=None, type=float,
@@ -384,6 +406,8 @@ if __name__ == '__main__':
         help='Use compression?')
     parser.add_argument('--save_with_compression_level',default=None, type=float,
         help='Compression level for SZ3, ABS mode only.')
+    parser.add_argument('--save_grid_diffs',default=None, type=str2bool,
+        help='Save the difference between grids to improve compression.')
 
 
     args = vars(parser.parse_args())

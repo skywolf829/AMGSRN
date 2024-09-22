@@ -14,6 +14,8 @@ import base64
 import io
 import numpy as np
 import subprocess
+import platform
+import os
 
 project_folder_path = os.path.dirname(os.path.abspath(__file__))
 project_folder_path = os.path.join(project_folder_path, "..", "..")
@@ -96,15 +98,78 @@ def convert_tcnn_to_pytorch(ckpt, opt):
     return ckpt
 
 def save_model(model,opt):
+
     with torch.no_grad():
         folder = create_folder(save_folder, opt["save_name"])
         path_to_save = os.path.join(save_folder, folder)
         
-        if(opt['model'] == "TVAMGSRN" or not opt['save_with_compression']):
+        if(not opt['save_with_compression']):
             state_dict = model.state_dict()
             torch.save({'state_dict': state_dict}, 
                 os.path.join(path_to_save, "model.ckpt")
             )
+        elif(opt['model'] == "TVAMGSRN"):
+            last_grid_error = np.zeros([opt['n_grids'], opt['n_features'], *[int(i) for i in opt['feature_grid_shape'].split(",")]], dtype=np.float32)
+            for i, m in enumerate(model.models):
+                state_dict = m.state_dict()
+                # Create a temporary directory for compressed files
+                temp_dir = os.path.join(path_to_save, "temp_compressed")
+                os.makedirs(temp_dir, exist_ok=True)
+
+                try:
+                    # Attempt to compress feature grids using SZ3
+                    feature_grids = state_dict['feature_grids'].cpu().numpy().astype(np.float32)
+                    for j in range(feature_grids.shape[1]): # iterate over each channel
+                        grid = feature_grids[:, j]
+                        if(i > 0 and opt['save_grid_diffs']):
+                            last_grid = model.models[i-1].feature_grids[:, j].cpu().numpy().astype(np.float32)
+                            grid = grid - last_grid + last_grid_error[:,j]
+                        grid_path = os.path.join(temp_dir, f"feature_grid_{j}.raw")
+                        grid.tofile(grid_path)
+                        
+                        dims = ' '.join(str(d) for d in grid.shape)
+                        dim_flag = f"-{len(grid.shape)} {dims}"
+                        
+                        compressed_path = os.path.join(temp_dir, f"feature_grid_{j}.sz")
+                        command = f"sz3 -f -z {compressed_path} -i {grid_path} -M ABS {opt['save_with_compression_level']} {dim_flag}"
+                        subprocess.run(command, check=True)
+
+                        #decompress and get error to not accumulate error
+                        decompressed_path = os.path.join(temp_dir, f"feature_grid_{j}.out")
+                        command = f"sz3 -x -f -z {compressed_path} -o {decompressed_path} {dim_flag}"
+                        subprocess.run(command, check=True)
+                        decompressed_data = np.fromfile(decompressed_path, dtype=np.float32).reshape(grid.shape)
+                        error = grid - decompressed_data
+                        last_grid_error[:,j] = error
+                        os.remove(grid_path)
+                        os.remove(decompressed_path)
+                    # Save the rest of the model losslessly
+                    for key, tensor in state_dict.items():
+                        if key != 'feature_grids':
+                            np.save(os.path.join(temp_dir, f"{key}.npy"), tensor.cpu().numpy())
+                    opt['compressor_used'] = "sz3"
+
+                except Exception as e:
+                    print(f"Error during compression: {str(e)}. Saving all data losslessly.")
+                    # If compression fails, save everything losslessly
+                    for key, tensor in state_dict.items():
+                        np.save(os.path.join(temp_dir, f"{key}.npy"), tensor.cpu().numpy())
+                    opt['compressor_used'] = "none"
+
+                # Create a zip file containing all compressed and losslessly saved arrays
+                with zipfile.ZipFile(os.path.join(path_to_save, f"compressed_model_{i}.zip"), 'w') as zipf:
+                    for filename in os.listdir(temp_dir):
+                        zipf.write(os.path.join(temp_dir, filename), filename)
+
+                # Clean up temporary directory
+                for filename in os.listdir(temp_dir):
+                    os.remove(os.path.join(temp_dir, filename))
+                os.rmdir(temp_dir)
+            # zip all the compressed models
+            with zipfile.ZipFile(os.path.join(path_to_save, "compressed_models.zip"), 'w') as zipf:
+                for i in range(len(model.models)):
+                    zipf.write(os.path.join(path_to_save, f"compressed_model_{i}.zip"), f"compressed_model_{i}.zip")
+                    os.remove(os.path.join(path_to_save, f"compressed_model_{i}.zip"))  
         else: 
             state_dict = model.state_dict()
             # Create a temporary directory for compressed files
@@ -178,8 +243,70 @@ def load_model(opt, device):
 
     if(not opt['ensemble']):
         model = create_model(opt)
-        if opt['model'] == "TVAMGSRN" or not opt['save_with_compression']:
+        if not opt['save_with_compression']:
             model.load_state_dict(torch.load(os.path.join(path_to_load, "model.ckpt"))['state_dict'])
+        elif opt['model'] == "TVAMGSRN":
+            with zipfile.ZipFile(os.path.join(path_to_load, "compressed_models.zip"), 'r') as main_zipf, torch.no_grad():
+                for i,m in enumerate(model.models):
+                    with main_zipf.open(f"compressed_model_{i}.zip") as compressed_model:
+                        with zipfile.ZipFile(io.BytesIO(compressed_model.read())) as zipf:
+                            state_dict = {}
+                            for filename in zipf.namelist():
+                                if filename.endswith('.npy'):
+                                    with zipf.open(filename) as f:
+                                        state_dict[filename[:-4]] = torch.from_numpy(np.load(f))
+                                elif filename.endswith('.sz'):
+                                    if opt['compressor_used'] == "sz3":
+                                        with zipf.open(filename) as f:
+                                            temp_file = os.path.join(path_to_load, filename)
+                                            with open(temp_file, 'wb') as tf:
+                                                tf.write(f.read())
+                                        
+                                        decompressed_file = temp_file + '.out'
+                                        dims = "-4 " + str(opt['n_grids']) + " " + ' '.join(str(d) for d in opt['feature_grid_shape'].split(","))
+                                        command = f"sz3 -f -z {temp_file} -o {decompressed_file} {dims}"
+                                        print(command)
+                                        try:
+                                            subprocess.run(command, check=True)
+                                        except subprocess.CalledProcessError as e:
+
+                                            if "wsl" in platform.uname().release.lower():
+                                                # We're in WSL
+                                                print("Detected WSL environment. Using Windows CMD for decompression.")
+                                                
+                                                # Convert Linux paths to relative paths
+                                                temp_file_rel = os.path.relpath(temp_file, os.getcwd())
+                                                decompressed_file_rel = os.path.relpath(decompressed_file, os.getcwd())
+                                                
+                                                # Construct the command for Windows CMD
+                                                command = f"cmd.exe /c sz3 -f -z {temp_file_rel} -o {decompressed_file_rel} {dims}"
+                                                print(command)
+                                                try:
+                                                    subprocess.run(command.split(" "), check=True)
+                                                except subprocess.CalledProcessError as e:
+                                                    print(f"Error during decompression in WSL: {str(e)}. Make sure SZ3 is installed and accessible in Windows.")
+                                                    quit(4)
+                                            else:          
+                                                print(f"Error during decompression: {str(e)}. Make sure SZ3 is installed.")                                      
+                                                quit(4)
+                                        
+                                        decompressed_data = np.fromfile(decompressed_file, dtype=np.float32).reshape(
+                                            [opt['n_grids'], *[int(i) for i in opt['feature_grid_shape'].split(",")]]
+                                        )
+                                        os.remove(temp_file)
+                                        os.remove(decompressed_file)
+                                        
+                                        channel_num = int(filename.split('_')[-1].split('.')[0])
+                                        if 'feature_grids' not in state_dict:
+                                            state_dict['feature_grids'] = torch.zeros(
+                                                [opt['n_grids'], opt['n_features']] + 
+                                                [int(i) for i in opt['feature_grid_shape'].split(",")], 
+                                                dtype=torch.float32)
+                                        if i > 0 and opt['save_grid_diffs']:
+                                            decompressed_data = decompressed_data + model.models[i-1].feature_grids[:, channel_num].cpu().numpy()
+                                        state_dict['feature_grids'][:, channel_num] = torch.from_numpy(decompressed_data)
+                            
+                            m.load_state_dict(state_dict)
         else:
             # Load the compressed model
             with zipfile.ZipFile(os.path.join(path_to_load, "compressed_model.zip"), 'r') as zipf:
@@ -199,20 +326,36 @@ def load_model(opt, device):
                             # Decompress using SZ3
                             decompressed_file = temp_file + '.out'
                             dims = "-4 " + str(opt['n_grids']) + " " + ' '.join(str(d) for d in opt['feature_grid_shape'].split(","))
-                            command = f"sz3 -x -f -z {temp_file} -o {decompressed_file} {dims}"
+                            command = f"sz3 -f -z {temp_file} -o {decompressed_file} {dims}"
                             print(command)
                             try:
                                 subprocess.run(command, check=True)
-                            except subprocess.CalledProcessError as e:
-                                print(f"Error during decompression: {str(e)}. Make sure SZ3 is installed.")
-                                quit(4)
+                            except Exception as e:
+                                if "wsl" in platform.uname().release.lower():
+                                    # We're in WSL
+                                    print("Detected WSL environment. Using Windows CMD for decompression.")
+                                    
+                                    # Convert Linux paths to relative paths
+                                    temp_file_rel = os.path.relpath(temp_file, os.getcwd())
+                                    decompressed_file_rel = os.path.relpath(decompressed_file, os.getcwd())
+                                    
+                                    # Construct the command for Windows CMD
+                                    command = f"cmd.exe /c sz3 -f -z {temp_file_rel} -o {decompressed_file_rel} {dims}"
+                                    print(command)
+                                    try:
+                                        subprocess.run(command.split(" "), check=True)
+                                    except subprocess.CalledProcessError as e:
+                                        print(f"Error during decompression in WSL: {str(e)}. Make sure SZ3 is installed and accessible in Windows.")
+                                        quit(4)
+                                else:          
+                                    print(f"Error during decompression: {str(e)}. Make sure SZ3 is installed.")                                      
+                                    quit(4)
                             
                             # Load decompressed data
                             decompressed_data = np.fromfile(decompressed_file, dtype=np.float32).reshape(
                                 [opt['n_grids'], 
                                 *[int(i) for i in opt['feature_grid_shape'].split(",")]]
                             )
-                            print(decompressed_data.shape)
                             os.remove(temp_file)
                             os.remove(decompressed_file)
                             

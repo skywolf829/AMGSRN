@@ -28,7 +28,7 @@ class Dataset(torch.utils.data.Dataset):
             # iterate over all timesteps (entries in)
             self.file_names = sorted(os.listdir(os.path.join(data_folder, self.opt['data'])))    
             # remove anything that isn't a .h5 file
-            self.file_names = [os.path.join(data_folder, self.opt['data'], f) for f in self.file_names if f.endswith('.h5')]
+            self.file_names = [os.path.join(data_folder, self.opt['data'], f) for f in self.file_names if f.endswith('.h5') or f.endswith('.nc')]
             self.n_timesteps = len(self.file_names)
             d, full_shape = nc_to_tensor(self.file_names[0], self.opt)
             d = d.to(self.opt['data_device'])

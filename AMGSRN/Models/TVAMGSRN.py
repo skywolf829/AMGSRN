@@ -39,6 +39,10 @@ class TVAMGSRN(nn.Module):
         if(t != self.default_timestep):
             self.default_timestep = t
 
+    @property
+    def feature_grids(self):
+        return self.models[self.default_timestep].feature_grids
+    
     def transformation_matrices(self, t: int = None):
         if t is None:
             t = self.default_timestep
@@ -74,9 +78,9 @@ class TVAMGSRN(nn.Module):
         else:
             with torch.no_grad():
                 # Clone feature grids and transformation parameters
-                #self.models[t].feature_grids = nn.Parameter(self.models[t-1].feature_grids.clone().detach())
-                self.models[t].translations = nn.Parameter(self.models[t-1].translations.clone().detach())
-                self.models[t]._rotations = nn.Parameter(self.models[t-1]._rotations.clone().detach())
+                self.models[t].feature_grids = nn.Parameter(self.models[t-1].feature_grids.clone().detach())
+                #self.models[t].translations = nn.Parameter(self.models[t-1].translations.clone().detach())
+                #self.models[t]._rotations = nn.Parameter(self.models[t-1]._rotations.clone().detach())
                 #self.models[t]._scales = nn.Parameter(
                 #    self.models[t].inv_scale_activation(0.75 * self.models[t-1].scales.clone().detach())
                 #)

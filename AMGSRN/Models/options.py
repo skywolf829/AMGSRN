@@ -47,6 +47,8 @@ class Options():
         opt['lr']                                   = 0.01
         opt['transform_lr']                         = 0.001
         opt['tv_weight']                            = 0.0001
+        opt['grid_diff_weight']                     = 0
+        opt['l1_regularization']                    = 0.000025
         opt['beta_1']                               = 0.9
         opt['beta_2']                               = 0.99
 
@@ -60,6 +62,7 @@ class Options():
         opt['compressor_used']                      = "none"
         opt['save_with_compression']                = True
         opt['save_with_compression_level']          = 0.01
+        opt['save_grid_diffs']                      = False
         return opt
 
 def save_options(opt, save_location):

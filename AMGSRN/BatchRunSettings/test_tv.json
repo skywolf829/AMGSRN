@@ -1,7 +1,7 @@
 [    
     [ "test.py",
         {        
-        "load_from": "supernova_tv",
-        "tests": "psnr,reconstruction"
+        "load_from": "supernova_tv_onlycompress",
+        "tests": "psnr"
     }]
 ]

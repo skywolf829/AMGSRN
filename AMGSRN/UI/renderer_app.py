@@ -735,11 +735,15 @@ class RendererThread(QObject):
         print(f"Loading model {s}")
         self.opt = load_options(os.path.abspath(os.path.join('SavedModels', s)))
         self.model = load_model(self.opt, self.device).to(self.device)
+        print(f"Model loaded")
         self.model.eval()
-        self.do_change_timestep(0)
+        print(f"Getting extents")
         self.full_shape = self.model.get_volume_extents()
-        self.tf.set_minmax(self.model.min(), self.model.max())        
+        print(f"Setting minmax")
+        self.tf.set_minmax(self.model.min(), self.model.max()) 
+        print(f"Setting scene model")
         self.scene.model = self.model
+        print(f"Setting aabb")
         self.scene.set_aabb([ 
                 self.full_shape[2]-1,
                 self.full_shape[1]-1,
@@ -747,13 +751,15 @@ class RendererThread(QObject):
                 ])
         #self.scene.precompute_occupancy_grid()
         print(f"Min/max: {self.model.min().item():0.02f}/{self.model.max().item():0.02f}")
+        print(f"Setting timestep max")
         self.parent.timestep_max.emit(self.opt['n_timesteps']-1)
+        print(f"Calling on_setting_change")
         self.scene.on_setting_change()
         render_mutex.unlock()
     
     def do_change_timestep(self, t):
-        render_mutex.lock()
         print(f"Setting timestep to {t}")
+        render_mutex.lock()
         self.model.set_default_timestep(t)
         self.scene.on_rotate_zoom_pan()
         render_mutex.unlock()

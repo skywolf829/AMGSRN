@@ -330,6 +330,10 @@ class AMGSRN_old(nn.Module):
     def get_transform_parameters(self):
         return [{"params": self.encoder.transformation_matrices}]
     
+    @property
+    def feature_grids(self):
+        return self.encoder.feature_grids
+    
     def get_model_parameters(self):
         return [
             {"params": [self.encoder.feature_grids]},

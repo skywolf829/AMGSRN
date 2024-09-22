@@ -357,9 +357,9 @@ class Camera():
         
         up = torch.tensor([0., 1., 0.]).to(zaxis)
             
-        xaxis = torch.cross(normalize(up), zaxis)
+        xaxis = torch.cross(normalize(up), zaxis, dim=-1)
         xaxis = normalize(xaxis) if xaxis.sum() != 0. else xaxis
-        yaxis = torch.cross(zaxis, xaxis)
+        yaxis = torch.cross(zaxis, xaxis, dim=-1)
         
         vMat = torch.tensor([
             [xaxis[0], xaxis[1], xaxis[2], -torch.dot(self.eye, xaxis)],
