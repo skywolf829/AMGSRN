@@ -1,0 +1,20 @@
+[
+    [ "test.py",
+        {        
+            "load_from": "asteroid_comp_test",
+            "tests": "compression"
+        }
+    ],
+    [ "test.py",
+        {        
+            "load_from": "chameleon_comp_test",
+            "tests": "compression"
+        }
+    ],
+    [ "test.py",
+        {        
+            "load_from": "supernova_comp_test",
+            "tests": "compression"
+        }
+    ]
+]
