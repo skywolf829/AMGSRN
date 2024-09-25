@@ -4,12 +4,10 @@ from torch.amp import custom_fwd, custom_bwd
 
 class CreateTransformationMatricesFunction(torch.autograd.Function):
     @staticmethod
-    @custom_fwd(device_type="cuda", cast_inputs=torch.float16)
+    @custom_fwd(device_type="cuda")
     def forward(ctx, rotations, scales, translations):
-        # Store for use in backward
         ctx.save_for_backward(rotations, scales, translations)
 
-        # Assuming create_transformation_matrices is your compiled CUDA function for forward pass
         result = _C.createTransformationMatricesForward(rotations, scales, translations)
 
         return result
@@ -19,7 +17,6 @@ class CreateTransformationMatricesFunction(torch.autograd.Function):
     def backward(ctx, grad_output):
         rotations, scales, translations = ctx.saved_tensors
 
-        # Assuming create_transformation_matrices_backward is your compiled CUDA function for backward pass
         grad_rotations, grad_scales, grad_translations = _C.createTransformationMatricesBackward(rotations, scales, translations, grad_output)
 
         return grad_rotations, grad_scales, grad_translations
@@ -27,35 +24,36 @@ class CreateTransformationMatricesFunction(torch.autograd.Function):
 class EncodeCoordinates(torch.autograd.Function):
     @staticmethod
     @custom_fwd(device_type="cuda", cast_inputs=torch.float16)
-    def forward(ctx, query_coordinates, rotations, scales, translations, feature_grids):
-
-        # Assuming create_transformation_matrices is your compiled CUDA function for forward pass
-        feature_vectors = _C.encodeForward(query_coordinates, rotations, 
-                                           scales, translations, feature_grids)
-
-        # Store for use in backward
-        ctx.save_for_backward(query_coordinates, rotations, 
-                        scales, translations, feature_grids)
-
+    def forward(ctx, query_coordinates : torch.Tensor, rotations : torch.Tensor, 
+                scales : torch.Tensor, translations : torch.Tensor, feature_grids : torch.Tensor):
+        permuted_query = query_coordinates.permute(1, 0).contiguous()
+        permuted_grids = feature_grids.permute(2, 3, 4, 0, 1).contiguous()
+        feature_vectors = _C.encodeForward(permuted_query, rotations, 
+                                        scales, translations, permuted_grids)
+        if any(ctx.needs_input_grad[1:]):  # Check if any input requires gradient
+            ctx.save_for_backward(permuted_query, rotations, 
+                        scales, translations, permuted_grids)
         return feature_vectors
 
     @staticmethod
     @custom_bwd(device_type="cuda")
     def backward(ctx, grad_output):
+        if not ctx.saved_tensors:
+            return None, None, None, None, None
+        
         query_coordinates, rotations, scales, \
             translations, feature_grids = ctx.saved_tensors
 
-        # Assuming create_transformation_matrices_backward is your compiled CUDA function for backward pass
         grad_feature_grids = _C.encodeBackward(query_coordinates, 
             rotations, scales, translations, feature_grids, grad_output)
+        
+        grad_feature_grids = grad_feature_grids.permute(3, 4, 0, 1, 2).contiguous()
         return None, None, None, None, grad_feature_grids
 
 class FeatureDensity(torch.autograd.Function):
     @staticmethod
     @custom_fwd(device_type="cuda") # This one doesn't benefit from float16, actually hurts performance
     def forward(ctx, query_coordinates, rotations, scales, translations):
-
-        # Assuming create_transformation_matrices is your compiled CUDA function for forward pass
         density = _C.featureDensityForward(query_coordinates, rotations, 
                                            scales, translations)
 
@@ -71,7 +69,6 @@ class FeatureDensity(torch.autograd.Function):
         query_coordinates, rotations, \
             scales, translations = ctx.saved_tensors
         
-        # Assuming create_transformation_matrices_backward is your compiled CUDA function for backward pass
         dL_dRotations, dL_dScales, dL_dTranslations = _C.featureDensityBackward(query_coordinates, 
             rotations, scales, translations, grad_output)
 

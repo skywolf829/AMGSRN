@@ -1,22 +1,20 @@
 [
     [ "train.py",
-        {        
-            "save_name": "woodbranch",
-            "model": "AMGSRN",
-            "data": "woodbranch.nc",
-            "n_features": 2,
-            "n_grids": 32,
-            "feature_grid_shape": "32,32,32",
-            "n_layers": 2,
-            "nodes_per_layer": 64,
-            "log_every": 50,
-            "log_features_every": 100,
-            "lr": 0.01,
-            "transform_lr": 0.001,
-            "tv_weight": 0.0001,
-            "save_with_compression": true,
-            "save_with_compression_level": 0.01,
-            "ensemble": true,
-            "ensemble_grid": "2,2,2"
+    {        
+        "save_name": "supernova_cuda_noamp",
+        "model": "AMGSRN",
+        "data": "supernova1327.h5",
+        "n_features": 2,
+        "n_grids": 32,
+        "feature_grid_shape": "32,32,32",
+        "n_layers": 2,
+        "nodes_per_layer": 64,
+        "log_every": 50,
+        "log_features_every": 100,
+        "lr": 0.01,
+        "transform_lr": 0.001,
+        "tv_weight": 0.0001,
+        "save_with_compression": false,
+        "use_amp": false
     }]
 ]

@@ -138,7 +138,7 @@ def test_grid_influence(model, opt):
     worst = np.argmin(grid_influences)
     print(f"Weakest influence - grid {worst}: {grid_influences[worst] :0.08f} RMSE")
 
-def test_psnr_chunked(model, dataset, opt):
+def test_psnr_chunked(model, opt):
     
     data_max = None
     data_min = None
@@ -160,6 +160,9 @@ def test_psnr_chunked(model, dataset, opt):
                     
                     opt['extents'] = f"{z_ind},{z_ind_end},{y_ind},{y_ind_end},{x_ind},{x_ind_end}"
                     print(f"Extents: {z_ind},{z_ind_end},{y_ind},{y_ind_end},{x_ind},{x_ind_end}")
+                    dataset = Dataset(opt)
+                    dataset.set_default_timestep(model.get_default_timestep())
+                    dataset.load_timestep(model.get_default_timestep())
                     data = dataset.data[dataset.default_timestep]
                     data = data[0].flatten(1,-1).permute(1,0)
                     
@@ -196,10 +199,13 @@ def test_psnr_chunked(model, dataset, opt):
                         end_ind = min(coord_grid.shape[0], start+2**20)
                         output = model(coord_grid[start:end_ind].to(opt['device']).float()).to(opt['data_device'])
                         data[start:end_ind] -= output
-        
+                        torch.cuda.empty_cache()
+
                     data **= 2
                     SSE += data.sum()
                     print(f"Chunk {z_ind},{z_ind_end},{y_ind},{y_ind_end},{x_ind},{x_ind_end} SSE: {data.sum()}")
+                    del coord_grid, output, data
+                    torch.cuda.empty_cache()
         
         MSE = SSE / (full_shape[0]*full_shape[1]*full_shape[2])
         #print(f"MSE: {MSE}, shape {full_shape}")
@@ -256,6 +262,7 @@ def scale_distribution(model, opt):
     plt.savefig(os.path.join(output_folder, "ScaleDistributions", opt['save_name']+'.png'))
 
 def test_throughput(model, opt):
+    import torch.profiler
 
     batch = 2**23
     num_forward = 100
@@ -270,9 +277,12 @@ def test_throughput(model, opt):
         torch.cuda.synchronize()
         t0 = time.time()
         for i in range(num_forward):
-            model(input_data)
-
-        torch.cuda.synchronize()
+            if i == num_forward // 2:  # Profile the middle iteration
+                with torch.profiler.profile(activities=[torch.profiler.ProfilerActivity.CPU, torch.profiler.ProfilerActivity.CUDA], record_shapes=True, profile_memory=True) as prof:
+                    model(input_data)
+            else:
+                model(input_data)
+            torch.cuda.synchronize()
         t1 = time.time()
     passed_time = t1 - t0
     points_queried = batch * num_forward
@@ -281,6 +291,9 @@ def test_throughput(model, opt):
     GBytes = (torch.cuda.max_memory_allocated(device=opt['device']) \
                 / (1024**3))
     print(f"{GBytes : 0.02f}GB of memory used during test.")
+    
+    # Save the trace
+    prof.export_chrome_trace(os.path.join(output_folder, opt['save_name'] + "_forward_trace.json"))
 
     torch.cuda.empty_cache()
     torch.cuda.reset_accumulated_memory_stats()
@@ -291,9 +304,12 @@ def test_throughput(model, opt):
         torch.cuda.synchronize()
         t0 = time.time()
         for i in range(num_forward):
-            model(input_data)
-
-        torch.cuda.synchronize()
+            if i == num_forward // 2:  # Profile the middle iteration
+                with torch.profiler.profile(activities=[torch.profiler.ProfilerActivity.CPU, torch.profiler.ProfilerActivity.CUDA], record_shapes=True, profile_memory=True) as prof:
+                    model(input_data)
+            else:
+                model(input_data)
+            torch.cuda.synchronize()
         t1 = time.time()
     passed_time = t1 - t0
     points_queried = batch * num_forward
@@ -302,6 +318,9 @@ def test_throughput(model, opt):
     GBytes = (torch.cuda.max_memory_allocated(device=opt['device']) \
                 / (1024**3))
     print(f"{GBytes : 0.02f}GB of memory used during test.")
+    
+    # Save the trace for AMP forward
+    prof.export_chrome_trace(os.path.join(output_folder, opt['save_name'] + "_amp_forward_trace.json"))
 
 def feature_density(model, opt):
     
@@ -883,19 +902,19 @@ def compress_and_test_fpzip(model, test_model, dataset, opt, precision, param_su
     return total_compressed_size / (1024 * 1024), psnr  # Return size in MB
 
 
-def perform_tests(model, dataset, tests, opt, timestep):
+def perform_tests(model, tests, opt, timestep):
     if("reconstruction" in tests):
         model_reconstruction_chunked(model, opt, timestep),
     if("feature_locations" in tests):
         feature_locations(model, opt)
     if("error_volume" in tests):
-        error_volume(model, dataset, opt)
+        error_volume(model, opt)
     if("scale_distribution" in tests):
         scale_distribution(model, opt)
     if("feature_density" in tests):
         feature_density(model, opt)
     if("psnr" in tests):
-        p = test_psnr_chunked(model, dataset, opt)
+        p = test_psnr_chunked(model, opt)
     if("histogram" in tests):
         data_hist(model, opt)
     if("throughput" in tests):
@@ -903,7 +922,7 @@ def perform_tests(model, dataset, tests, opt, timestep):
     if("grid_influence" in tests):
         test_grid_influence(model, opt)
     if("quantize" in tests):
-        quantize_model(model, dataset, opt)
+        quantize_model(model, opt)
     if("torchscript" in tests):
         convert_to_torchscript(model, opt)
     if("trt" in tests):
@@ -946,7 +965,6 @@ if __name__ == '__main__':
     model = model.to(opt['device'])
     model.train(False)
     model.eval()
-    dataset = Dataset(opt)
     
     # Perform tests
     psnrs = []
@@ -955,12 +973,9 @@ if __name__ == '__main__':
         if opt['n_timesteps'] > 1:
             print(f"========= Timestep {t} ==========")
         model.set_default_timestep(t)
-        dataset.set_default_timestep(t)
-        dataset.load_timestep(t)
-        p = perform_tests(model, dataset, tests_to_run, opt, timestep=t)
+        p = perform_tests(model, tests_to_run, opt, timestep=t)
         if(p is not None):
             psnrs.append(p)
-        dataset.unload_timestep(t)
         model.unload_timestep(t)
         print()
     

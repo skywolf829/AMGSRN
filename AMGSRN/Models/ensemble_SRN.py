@@ -90,6 +90,8 @@ class Ensemble_SRN(nn.Module):
         return val
     def set_default_timestep(self, timestep:int):
         pass
+    def get_default_timestep(self):
+        return 0
     def prepare_timestep(self, timestep:int):
         pass
     def unload_timestep(self, timestep:int):
@@ -116,8 +118,9 @@ class Ensemble_SRN(nn.Module):
         for i in range(len(self.models)):
             mask = (indices == i)
             x_i = x[mask]
-            y[mask] = self.models[i](-1+2*((x_i-self.local_min_extents[i])/\
-                (self.local_max_extents[i]-self.local_min_extents[i])))
+            if(x_i.shape[0] > 0):
+                y[mask] = self.models[i](-1+2*((x_i-self.local_min_extents[i])/\
+                    (self.local_max_extents[i]-self.local_min_extents[i])))
         return y
 
         

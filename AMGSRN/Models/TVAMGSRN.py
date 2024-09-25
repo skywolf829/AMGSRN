@@ -38,6 +38,8 @@ class TVAMGSRN(nn.Module):
     def set_default_timestep(self, t: int):
         if(t != self.default_timestep):
             self.default_timestep = t
+    def get_default_timestep(self):
+        return self.default_timestep
 
     @property
     def feature_grids(self):

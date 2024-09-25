@@ -14,8 +14,7 @@
             "lr": 0.01,
             "transform_lr": 0.001,
             "tv_weight": 0.0001,
-            "save_with_compression": true,
-            "save_with_compression_level": 0.01,
+            "save_with_compression": false,
             "ensemble": true,
             "ensemble_grid": "2,2,2"
     }],
@@ -34,8 +33,7 @@
             "lr": 0.01,
             "transform_lr": 0.001,
             "tv_weight": 0.0001,
-            "save_with_compression": true,
-            "save_with_compression_level": 0.01,
+            "save_with_compression": false,
             "ensemble": true,
             "ensemble_grid": "2,2,2"
     }],
@@ -54,8 +52,7 @@
             "lr": 0.01,
             "transform_lr": 0.001,
             "tv_weight": 0.0001,
-            "save_with_compression": true,
-            "save_with_compression_level": 0.01
+            "save_with_compression": false
     }],
     [ "train.py",
         {        
@@ -72,8 +69,7 @@
             "lr": 0.01,
             "transform_lr": 0.001,
             "tv_weight": 0.0001,
-            "save_with_compression": true,
-            "save_with_compression_level": 0.01
+            "save_with_compression": false
     }],
     [ "train.py",
         {        
@@ -90,8 +86,7 @@
             "lr": 0.01,
             "transform_lr": 0.001,
             "tv_weight": 0.0001,
-            "save_with_compression": true,
-            "save_with_compression_level": 0.01
+            "save_with_compression": false
     }],
     [ "train.py",
         {        
@@ -108,14 +103,13 @@
             "lr": 0.01,
             "transform_lr": 0.001,
             "tv_weight": 0.0001,
-            "save_with_compression": true,
-            "save_with_compression_level": 0.01
+            "save_with_compression": false
     }],
     [ "train.py",
         {        
             "save_name": "asteroid_small_cuda",
             "model": "AMGSRN",
-            "data": "asteroid.nc",
+            "data": "asteroid_17602-076.nc",
             "n_features": 2,
             "n_grids": 32,
             "feature_grid_shape": "32,32,32",
@@ -126,14 +120,13 @@
             "lr": 0.01,
             "transform_lr": 0.001,
             "tv_weight": 0.0001,
-            "save_with_compression": true,
-            "save_with_compression_level": 0.01
+            "save_with_compression": false
     }],
     [ "train.py",
         {        
             "save_name": "asteroid_small_pytorch",
             "model": "AMGSRN_pytorch",
-            "data": "asteroid.nc",
+            "data": "asteroid_17602-076.nc",
             "n_features": 2,
             "n_grids": 32,
             "feature_grid_shape": "32,32,32",
@@ -144,7 +137,6 @@
             "lr": 0.01,
             "transform_lr": 0.001,
             "tv_weight": 0.0001,
-            "save_with_compression": true,
-            "save_with_compression_level": 0.01
+            "save_with_compression": false
     }]
 ]

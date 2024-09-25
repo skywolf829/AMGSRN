@@ -1,7 +1,7 @@
 [    
     [ "test.py",
         {        
-        "load_from": "supernova",
+        "load_from": "supernova1327",
         "tests": "psnr,throughput"
     }]
 ]

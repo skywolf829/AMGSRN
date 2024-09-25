@@ -51,12 +51,12 @@ torch::Tensor encode_forward(
     const torch::Tensor& translations,
     const torch::Tensor& feature_grids)
 {
-    const auto num_points = query_points.size(0);
-    const auto num_grids = feature_grids.size(0);
-    const auto features_per_grid = feature_grids.size(1);
-    const auto D = feature_grids.size(2);
-    const auto H = feature_grids.size(3);
-    const auto W = feature_grids.size(4);    
+    const auto num_points = query_points.size(1);
+    const auto num_grids = feature_grids.size(3);
+    const auto features_per_grid = feature_grids.size(4);
+    const auto D = feature_grids.size(0);
+    const auto H = feature_grids.size(1);
+    const auto W = feature_grids.size(2);    
 
     auto options = torch::TensorOptions().dtype(query_points.dtype()).device(query_points.device());
 
@@ -84,16 +84,16 @@ torch::Tensor encode_backward(
     const torch::Tensor& feature_grids,
     const torch::Tensor& dL_dFeatureVectors)
 {
-    const auto num_points = query_points.size(0);
-    const auto num_grids = feature_grids.size(0);
-    const auto features_per_grid = feature_grids.size(1);
-    const auto D = feature_grids.size(2);
-    const auto H = feature_grids.size(3);
-    const auto W = feature_grids.size(4);    
+    const auto num_points = query_points.size(1);
+    const auto num_grids = feature_grids.size(3);
+    const auto features_per_grid = feature_grids.size(4);
+    const auto D = feature_grids.size(0);
+    const auto H = feature_grids.size(1);
+    const auto W = feature_grids.size(2);    
 
     auto options = torch::TensorOptions().dtype(query_points.dtype()).device(query_points.device());
 
-    torch::Tensor dL_dFeatureGrids = torch::zeros({num_grids, features_per_grid, D, H, W}, options);
+    torch::Tensor dL_dFeatureGrids = torch::zeros({D, H, W, num_grids, features_per_grid}, options);
 
     AT_DISPATCH_FLOATING_TYPES_AND_HALF(query_points.scalar_type(), "launch_encode_backward", ([&] {
         launch_encode_backward<scalar_t>(

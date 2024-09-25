@@ -8,13 +8,14 @@
 
 #define THREADS_PER_BLOCK 256
 template <typename scalar_t>
-struct scalar_t3 {
+struct __align__(16) scalar_t3 {
     scalar_t x;
     scalar_t y;
     scalar_t z;
+    scalar_t padding;  // Add padding to ensure 16-byte alignment
 
-    __device__ __host__ scalar_t3() : x(0), y(0), z(0) {}
-    __device__ __host__ scalar_t3(scalar_t x_, scalar_t y_, scalar_t z_) : x(x_), y(y_), z(z_) {}
+    __device__ __host__ scalar_t3() : x(0), y(0), z(0), padding(0) {}
+    __device__ __host__ scalar_t3(scalar_t x_, scalar_t y_, scalar_t z_) : x(x_), y(y_), z(z_), padding(0) {}
 };
 template <typename scalar_t>
 __host__ __device__ __forceinline__ scalar_t3<scalar_t> make_scalar_t3(scalar_t x, scalar_t y, scalar_t z) {
@@ -35,6 +36,19 @@ __device__ __forceinline__ scalar_t3<scalar_t> transformPoint(
     );
 }
 
+template <typename scalar_t>
+__device__ __forceinline__ scalar_t3<scalar_t> transformPoint(
+    const scalar_t* rotationMatrix,
+    const scalar_t* translations,
+    const scalar_t3<scalar_t>& pos) {
+        
+    return make_scalar_t3<scalar_t>(
+        rotationMatrix[0] * pos.x + rotationMatrix[1] * pos.y + rotationMatrix[2] * pos.z + translations[0],
+        rotationMatrix[3] * pos.x + rotationMatrix[4] * pos.y + rotationMatrix[5] * pos.z + translations[1],
+        rotationMatrix[6] * pos.x + rotationMatrix[7] * pos.y + rotationMatrix[8] * pos.z + translations[2]
+    );
+}
+
 
 template <typename scalar_t>
 __device__ void trilinearInterpolate(
@@ -44,9 +58,10 @@ __device__ void trilinearInterpolate(
     const scalar_t3<scalar_t>& point,
     at::PackedTensorAccessor32<scalar_t,2,torch::RestrictPtrTraits> output) {
 
-    auto W = grid.size(4);  
-    auto H = grid.size(3);
-    auto D = grid.size(2);
+    auto W = grid.size(2);  
+    auto H = grid.size(1);
+    auto D = grid.size(0);
+    auto C = grid.size(4);
 
 
     scalar_t x = (W-1) * ((point.x+1.f)/2.f);
@@ -54,8 +69,9 @@ __device__ void trilinearInterpolate(
     scalar_t z = (D-1) * ((point.z+1.f)/2.f);
     
     if(x <= -1.f || y <= -1.f || z <= -1.f || x >= W || y >= H || z >= D){
-        for(int i = 0; i < grid.size(1); ++i) 
-            output[point_idx][grid_idx*grid.size(1)+i] = static_cast<scalar_t>(0);
+        #pragma unroll
+        for(int i = 0; i < C; ++i) 
+            output[point_idx][grid_idx*C+i] = static_cast<scalar_t>(0);
         return;
     }
 
@@ -79,19 +95,20 @@ __device__ void trilinearInterpolate(
     scalar_t w110 = (1-xd)*yd*zd;
     scalar_t w111 = xd*yd*zd;
 
-    for(int i = 0; i < grid.size(1); ++i) {
+    #pragma unroll
+    for(int i = 0; i < C; ++i) {
         scalar_t result = static_cast<scalar_t>(0);
 
-        result += (z0 >= 0 && y0 >= 0 && x0 >= 0) ? grid[grid_idx][i][z0][y0][x0] * w000 : static_cast<scalar_t>(0);
-        result += (z0 >= 0 && y0 >= 0 && x1 < W) ? grid[grid_idx][i][z0][y0][x1] * w001 : static_cast<scalar_t>(0);
-        result += (z0 >= 0 && y1 < H && x0 >= 0) ? grid[grid_idx][i][z0][y1][x0] * w010 : static_cast<scalar_t>(0);
-        result += (z0 >= 0 && y1 < H && x1 < W) ? grid[grid_idx][i][z0][y1][x1] * w011 : static_cast<scalar_t>(0);
-        result += (z1 < D && y0 >= 0 && x0 >= 0) ? grid[grid_idx][i][z1][y0][x0] * w100 : static_cast<scalar_t>(0);
-        result += (z1 < D && y0 >= 0 && x1 < W) ? grid[grid_idx][i][z1][y0][x1] * w101 : static_cast<scalar_t>(0);
-        result += (z1 < D && y1 < H && x0 >= 0) ? grid[grid_idx][i][z1][y1][x0] * w110 : static_cast<scalar_t>(0);
-        result += (z1 < D && y1 < H && x1 < W) ? grid[grid_idx][i][z1][y1][x1] * w111 : static_cast<scalar_t>(0);
+        result += (z0 >= 0 && y0 >= 0 && x0 >= 0) ? grid[z0][y0][x0][grid_idx][i] * w000 : static_cast<scalar_t>(0);
+        result += (z0 >= 0 && y0 >= 0 && x1 < W) ? grid[z0][y0][x1][grid_idx][i] * w001 : static_cast<scalar_t>(0);
+        result += (z0 >= 0 && y1 < H && x0 >= 0) ? grid[z0][y1][x0][grid_idx][i] * w010 : static_cast<scalar_t>(0);
+        result += (z0 >= 0 && y1 < H && x1 < W) ? grid[z0][y1][x1][grid_idx][i] * w011 : static_cast<scalar_t>(0);
+        result += (z1 < D && y0 >= 0 && x0 >= 0) ? grid[z1][y0][x0][grid_idx][i] * w100 : static_cast<scalar_t>(0);
+        result += (z1 < D && y0 >= 0 && x1 < W) ? grid[z1][y0][x1][grid_idx][i] * w101 : static_cast<scalar_t>(0);
+        result += (z1 < D && y1 < H && x0 >= 0) ? grid[z1][y1][x0][grid_idx][i] * w110 : static_cast<scalar_t>(0);
+        result += (z1 < D && y1 < H && x1 < W) ? grid[z1][y1][x1][grid_idx][i] * w111 : static_cast<scalar_t>(0);
 
-        output[point_idx][grid_idx*grid.size(1)+i] = result;
+        output[point_idx][grid_idx*C+i] = result;
     }
 }
 
@@ -103,11 +120,10 @@ __device__ void trilinearInterpolateBackwards(
     const scalar_t3<scalar_t>& point,
     const at::PackedTensorAccessor32<scalar_t,2,torch::RestrictPtrTraits> dL_dFeatureVector) {
     
-    auto num_grids = dL_dFeatureGrids.size(0);
-    auto C = dL_dFeatureGrids.size(1);
-    auto W = dL_dFeatureGrids.size(4);
-    auto H = dL_dFeatureGrids.size(3);
-    auto D = dL_dFeatureGrids.size(2);
+    auto C = dL_dFeatureGrids.size(4);
+    auto W = dL_dFeatureGrids.size(2);
+    auto H = dL_dFeatureGrids.size(1);
+    auto D = dL_dFeatureGrids.size(0);
 
     
 
@@ -131,23 +147,32 @@ __device__ void trilinearInterpolateBackwards(
     scalar_t yd = y - y0;
     scalar_t zd = z - z0;
 
-    bool x0_in = (x0 != -1);
-    bool x1_in = (x1 != W);
-    bool y0_in = (y0 != -1);
-    bool y1_in = (y1 != H);
-    bool z0_in = (z0 != -1);
-    bool z1_in = (z1 != D);
+    scalar_t w[8] = {
+        (1-xd)*(1-yd)*(1-zd),
+        xd*(1-yd)*(1-zd),
+        (1-xd)*yd*(1-zd),
+        xd*yd*(1-zd),
+        (1-xd)*(1-yd)*zd,
+        xd*(1-yd)*zd,
+        (1-xd)*yd*zd,
+        xd*yd*zd
+    };
 
-    for(int i = 0; i < C; ++i){
+    int3 corners[8] = {
+        {z0, y0, x0}, {z0, y0, x1}, {z0, y1, x0}, {z0, y1, x1},
+        {z1, y0, x0}, {z1, y0, x1}, {z1, y1, x0}, {z1, y1, x1}
+    };
+
+    #pragma unroll
+    for(int i = 0; i < C; ++i) {
         scalar_t dL_dFeat = dL_dFeatureVector[point_idx][grid_idx*C+i];
-        if(z0_in && y0_in && x0_in) atomicAdd(&dL_dFeatureGrids[grid_idx][i][z0][y0][x0], dL_dFeat*(1-xd)*(1 - yd)*(1-zd));
-        if(z0_in && y0_in && x1_in) atomicAdd(&dL_dFeatureGrids[grid_idx][i][z0][y0][x1], dL_dFeat*xd*(1 - yd)*(1-zd));
-        if(z0_in && y1_in && x0_in) atomicAdd(&dL_dFeatureGrids[grid_idx][i][z0][y1][x0], dL_dFeat*(1-xd)*yd*(1-zd));
-        if(z0_in && y1_in && x1_in) atomicAdd(&dL_dFeatureGrids[grid_idx][i][z0][y1][x1], dL_dFeat*xd*yd*(1-zd));
-        if(z1_in && y0_in && x0_in) atomicAdd(&dL_dFeatureGrids[grid_idx][i][z1][y0][x0], dL_dFeat*(1-xd)*(1 - yd)*zd);
-        if(z1_in && y0_in && x1_in) atomicAdd(&dL_dFeatureGrids[grid_idx][i][z1][y0][x1], dL_dFeat*xd*(1 - yd)*zd);
-        if(z1_in && y1_in && x0_in) atomicAdd(&dL_dFeatureGrids[grid_idx][i][z1][y1][x0], dL_dFeat*(1-xd)*yd*zd);
-        if(z1_in && y1_in && x1_in) atomicAdd(&dL_dFeatureGrids[grid_idx][i][z1][y1][x1], dL_dFeat*xd*yd*zd);
+        #pragma unroll
+        for(int j = 0; j < 8; ++j) {
+            int3 c = corners[j];
+            if(c.x >= 0 && c.x < D && c.y >= 0 && c.y < H && c.z >= 0 && c.z < W) {
+                gpuAtomicAdd(&dL_dFeatureGrids[c.x][c.y][c.z][grid_idx][i], dL_dFeat * w[j]);
+            }
+        }
     }
 }
 
@@ -162,9 +187,9 @@ __global__ void encodeForwardKernel(
     const auto point_idx = blockIdx.x * blockDim.x + threadIdx.x;
     const auto grid_idx = blockIdx.y;
 
-    if (grid_idx >= feature_grids.size(0) || point_idx >= query_points.size(0)) return;
+    if (grid_idx >= feature_grids.size(3) || point_idx >= query_points.size(1)) return;
 
-    scalar_t3<scalar_t> point = make_scalar_t3<scalar_t>(query_points[point_idx][0], query_points[point_idx][1], query_points[point_idx][2]);
+    scalar_t3<scalar_t> point = make_scalar_t3<scalar_t>(query_points[0][point_idx], query_points[1][point_idx], query_points[2][point_idx]);
 
     scalar_t3<scalar_t> point_t = transformPoint<scalar_t>(grid_idx, rotation_matrices, translations, point);
     
@@ -187,16 +212,22 @@ __global__ void encodeBackwardKernel(
     const at::PackedTensorAccessor32<scalar_t,2,torch::RestrictPtrTraits> dL_dFeatureVectors,
     at::PackedTensorAccessor32<scalar_t,5,torch::RestrictPtrTraits> dL_dFeatureGrids) {
     
-    auto idx = blockIdx.x * blockDim.x + threadIdx.x;
-    if (idx >= query_points.size(0)) return;
+    const auto point_idx = blockIdx.x * blockDim.x + threadIdx.x;
+    const auto grid_idx = blockIdx.y;
+    if (grid_idx >= feature_grids.size(3) || point_idx >= query_points.size(1)) return;
 
-    scalar_t3<scalar_t> point = make_scalar_t3<scalar_t>(query_points[idx][0], query_points[idx][1], query_points[idx][2]);
+    __shared__ scalar_t s_rotation[9];
+    __shared__ scalar_t s_translation[3];
+    if (threadIdx.x < 9) s_rotation[threadIdx.x] = rotation_matrices[grid_idx * 9 + threadIdx.x];
+    if (threadIdx.x < 3) s_translation[threadIdx.x] = translations[grid_idx][threadIdx.x];
+    __syncthreads();
 
-    for(auto grid_idx = 0; grid_idx < feature_grids.size(0); ++grid_idx){
-        scalar_t3<scalar_t> point_t = transformPoint<scalar_t>(grid_idx, rotation_matrices, translations, point);
-        trilinearInterpolateBackwards<scalar_t>(grid_idx, idx, dL_dFeatureGrids, 
+    scalar_t3<scalar_t> point = make_scalar_t3<scalar_t>(query_points[0][point_idx], query_points[1][point_idx], query_points[2][point_idx]);
+    scalar_t3<scalar_t> point_t = transformPoint<scalar_t>(s_rotation, s_translation, point);
+    
+    trilinearInterpolateBackwards<scalar_t>(grid_idx, point_idx, dL_dFeatureGrids, 
         point_t, dL_dFeatureVectors);
-    }
+    
 }
 
 template <typename scalar_t>
@@ -303,7 +334,7 @@ __global__ void densityBackwardKernel(
             float ty19 = powf(point_t.y, 19.0f);
             float tz19 = powf(point_t.z, 19.0f); 
 
-            float g = __expf(-(powf(point_t.x, 20.0f) + powf(point_t.y, 20.0f) + powf(point_t.z, 20.0f)));
+            float g = expf(-(powf(point_t.x, 20.0f) + powf(point_t.y, 20.0f) + powf(point_t.z, 20.0f)));
             float det20g = -20.0f * det * g;
 
             shared_grads[s + 0] = dL_dD*det20g * tx19 * point.x +
@@ -345,10 +376,10 @@ __global__ void densityBackwardKernel(
         }
         __syncthreads();
         if (threadIdx.x < 9) {
-            atomicAdd(&dL_dRotation_matrix[i*9 + threadIdx.x], static_cast<scalar_t>(shared_sum[threadIdx.x]));
+            gpuAtomicAdd(&dL_dRotation_matrix[i*9 + threadIdx.x], static_cast<scalar_t>(shared_sum[threadIdx.x]));
         }
         else if(threadIdx.x < 12){
-            atomicAdd(&dL_dTranslations[i][threadIdx.x-9], static_cast<scalar_t>(shared_sum[threadIdx.x]));            
+            gpuAtomicAdd(&dL_dTranslations[i][threadIdx.x-9], static_cast<scalar_t>(shared_sum[threadIdx.x]));            
         }
     }
 }
@@ -623,7 +654,7 @@ void launch_encode_forward(
     const torch::Tensor& feature_grids,
     torch::Tensor& output_features)
 {
-    const int num_points = query_points.size(0);
+    const int num_points = query_points.size(1);
     const int num_grids = rotations.size(0);
 
     // Allocate memory for rotation matrices
@@ -661,7 +692,7 @@ void launch_encode_backward(
     const torch::Tensor& dL_dFeature_vectors,
     torch::Tensor& dL_dFeatureGrids)
 {
-    const int num_points = query_points.size(0);
+    const int num_points = query_points.size(1);
     const int num_grids = rotations.size(0);
 
     // Allocate memory for rotation matrices
@@ -675,9 +706,9 @@ void launch_encode_backward(
         rotation_matrices
     );
 
-    blocksPerGrid = (num_points + THREADS_PER_BLOCK - 1) / THREADS_PER_BLOCK;
-    // Next, perform interpolation (backward)
-    encodeBackwardKernel<<<blocksPerGrid, THREADS_PER_BLOCK>>>(
+    dim3 threadsPerBlock(THREADS_PER_BLOCK, 1);
+    dim3 numBlocks((num_points + THREADS_PER_BLOCK - 1) / THREADS_PER_BLOCK, num_grids);
+    encodeBackwardKernel<<<numBlocks, threadsPerBlock>>>(
         query_points.packed_accessor32<scalar_t,2,torch::RestrictPtrTraits>(),
         rotation_matrices,
         translations.packed_accessor32<scalar_t,2,torch::RestrictPtrTraits>(),

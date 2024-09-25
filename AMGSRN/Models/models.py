@@ -16,6 +16,7 @@ import numpy as np
 import subprocess
 import platform
 import os
+import traceback
 
 project_folder_path = os.path.dirname(os.path.abspath(__file__))
 project_folder_path = os.path.join(project_folder_path, "..", "..")
@@ -150,6 +151,7 @@ def save_model(model,opt):
                     opt['compressor_used'] = "sz3"
 
                 except Exception as e:
+                    traceback.print_exc()
                     print(f"Error during compression: {str(e)}. Saving all data losslessly.")
                     # If compression fails, save everything losslessly
                     for key, tensor in state_dict.items():
@@ -201,6 +203,7 @@ def save_model(model,opt):
                 opt['compressor_used'] = "sz3"
 
             except Exception as e:
+                traceback.print_exc()
                 print(f"Error during compression: {str(e)}. Saving all data losslessly.")
                 # If compression fails, save everything losslessly
                 for key, tensor in state_dict.items():

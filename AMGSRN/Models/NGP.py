@@ -51,6 +51,19 @@ class NGP(nn.Module):
             persistent=False
         )
     
+    def set_default_timestep(self, timestep:int):
+        pass
+
+    def get_default_timestep(self):
+        return 0
+
+    def prepare_timestep(self, timestep:int):
+        pass
+
+    def unload_timestep(self, timestep:int):
+        self.to('cpu')
+
+
     def min(self):
         return self.volume_min
 

@@ -323,6 +323,8 @@ class AMGSRN_old(nn.Module):
 
     def set_default_timestep(self, timestep:int):
         pass
+    def get_default_timestep(self):
+        return 0
     def prepare_timestep(self, timestep:int):
         pass
     def unload_timestep(self, timestep:int):

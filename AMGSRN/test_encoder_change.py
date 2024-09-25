@@ -4,7 +4,10 @@ from AMGSRN.Models.AMGSRN import AMGSRN
 from AMGSRN.Models.options import Options
 import torch
 from time import time
-    
+
+use_amp = True  # Global variable for controlling automatic mixed precision
+batch_size = 2**23  # Global variable for batch size
+
 def randomize_grids( n_grids:int, n_features:int,
                  feat_grid_shape:list[int], n_dims:int):  
     with torch.no_grad():     
@@ -33,27 +36,32 @@ def randomize_grids( n_grids:int, n_features:int,
     return feature_grids, translations, _scales, _rotations
 
 def forward_encode_test():
-
     print("======Forward encoding test======")
     feature_grids, translations, scales, rotations = randomize_grids(32, 2, [64, 64, 64], 3)
 
     torch.cuda.reset_peak_memory_stats()
-    x = torch.rand([2**23, 3], dtype=torch.float32, device="cuda")
+    x = torch.rand([batch_size, 3], dtype=torch.float32, device="cuda")
     s = torch.exp(scales)
     r = torch.nn.functional.normalize(rotations)
-    encode(x, r, s, translations, feature_grids)
     torch.cuda.synchronize()
-    t0 = time()
     
-    with torch.autocast(device_type='cuda', enabled=False), torch.no_grad():
-        for i in range(10):
+    with torch.autocast(device_type='cuda', enabled=use_amp, dtype=torch.float16), torch.no_grad():
+        # Warmup
+        for _ in range(5):
+            encode(x, r, s, translations, feature_grids)
+        torch.cuda.synchronize()
+        
+        t0 = time()
+        for _ in range(10):
             feats = encode(x, r, s, translations, feature_grids)
-    torch.cuda.synchronize()
-    t1 = time()
+        torch.cuda.synchronize()
+        t1 = time()
+    
     gb = torch.cuda.max_memory_allocated(device='cuda')/(1024**3)
     torch.cuda.reset_peak_memory_stats()
+    throughput = (batch_size * 10) / (t1 - t0)
     print(f"New encoder code took {t1-t0:0.02f}s with {gb:0.02f} GB VRAM")
-
+    print(f"New encoder throughput: {throughput:.2f} points/sec")
 
     old_encoder = AMG_encoder_old(32, 2, [64, 64, 64], 3, "default")
     old_encoder.feature_grids = torch.nn.Parameter(feature_grids.clone(), requires_grad=True)
@@ -64,38 +72,58 @@ def forward_encode_test():
     torch.cuda.reset_peak_memory_stats()
     old_encoder(x)
     torch.cuda.synchronize()
-    t0 = time()
     
-    with torch.autocast(device_type='cuda', enabled=False), torch.no_grad():
-        for i in range(10):
+    with torch.autocast(device_type='cuda', enabled=use_amp, dtype=torch.float16), torch.no_grad():
+        # Warmup
+        for _ in range(5):
+            old_encoder.forward(x)
+        torch.cuda.synchronize()
+        
+        t0 = time()
+        for _ in range(10):
             feats = old_encoder.forward(x)
-    torch.cuda.synchronize()
-    t1 = time()
+        torch.cuda.synchronize()
+        t1 = time()
+    
     gb = torch.cuda.max_memory_allocated(device='cuda')/(1024**3)
     torch.cuda.reset_peak_memory_stats()
+    throughput = (batch_size * 10) / (t1 - t0)
     print(f"Old encoder code took {t1-t0:0.02f}s with {gb:0.02f} GB VRAM")
+    print(f"Old encoder throughput: {throughput:.2f} points/sec")
 
     # cleanup all
-    del old_encoder, x
+    del old_encoder, x, feats
     torch.cuda.empty_cache()
+    torch.cuda.reset_peak_memory_stats()
 
 def backward_encode_test():
-
     torch.cuda.empty_cache()
+    torch.cuda.reset_peak_memory_stats()
     print("======Backward encoding test======")
+    scaler = torch.amp.GradScaler()
     feature_grids, translations, scales, rotations = randomize_grids(32, 2, [64, 64, 64], 3)
-    x = torch.rand([2**22, 3], dtype=torch.float32, device="cuda")
+    x = torch.rand([batch_size, 3], dtype=torch.float32, device="cuda")
+    
+    # Warmup
+    for _ in range(5):        
+        with torch.autocast(device_type='cuda', enabled=use_amp, dtype=torch.float16):
+            feats = encode(x, rotations, scales, translations, feature_grids)
+        scaler.scale(feats).sum().backward()
     torch.cuda.synchronize()
+        
     t0 = time()
-    for i in range(10):
-        feats = encode(x, rotations, scales, translations, feature_grids)
-        feats.sum().backward()
+    for _ in range(10):
+        with torch.autocast(device_type='cuda', enabled=use_amp, dtype=torch.float16):
+            feats = encode(x, rotations, scales, translations, feature_grids)
+        scaler.scale(feats).sum().backward()
     torch.cuda.synchronize()
     t1 = time()
+    
     gb = torch.cuda.max_memory_allocated(device='cuda')/(1024**3)
     torch.cuda.reset_peak_memory_stats()
+    throughput = (batch_size * 10) / (t1 - t0)
     print(f"New encoder code took {t1-t0:0.02f}s with {gb:0.02f} GB VRAM")
-
+    print(f"New encoder throughput: {throughput:.2f} points/sec")
 
     old_encoder = AMG_encoder_old(32, 2, [64, 64, 64], 3, "default")
     old_encoder.feature_grids = torch.nn.Parameter(feature_grids.clone(), requires_grad=True)
@@ -104,34 +132,58 @@ def backward_encode_test():
     del rotations, scales, translations, feature_grids, transformation_matrices
     torch.cuda.empty_cache()    
     torch.cuda.reset_peak_memory_stats()
+    
+        # Warmup
+    for _ in range(5):
+        with torch.autocast(device_type='cuda', enabled=use_amp, dtype=torch.float16):
+            feats = old_encoder(x)
+        scaler.scale(feats).sum().backward()
     torch.cuda.synchronize()
+        
     t0 = time()
-    for i in range(10):
-        feats = old_encoder(x)
-        feats.sum().backward()
+    for _ in range(10):
+        with torch.autocast(device_type='cuda', enabled=use_amp, dtype=torch.float16):
+            feats = old_encoder(x)
+        scaler.scale(feats).sum().backward()
     torch.cuda.synchronize()
     t1 = time()
+    
     gb = torch.cuda.max_memory_allocated(device='cuda')/(1024**3)
     torch.cuda.reset_peak_memory_stats()
+    throughput = (batch_size * 10) / (t1 - t0)
     print(f"Old encoder code took {t1-t0:0.02f}s with {gb:0.02f} GB VRAM")
+    print(f"Old encoder throughput: {throughput:.2f} points/sec")
+
+    # Cleanup
+    del old_encoder, x, feats
+    torch.cuda.empty_cache()
+    torch.cuda.reset_peak_memory_stats()
 
 def forward_density_test():
-
+    torch.cuda.empty_cache()
+    torch.cuda.reset_peak_memory_stats()
     print("======Forward density test======")
     feature_grids, translations, scales, rotations = randomize_grids(32, 2, [64, 64, 64], 3)
 
-    x = torch.rand([2**23, 3], dtype=torch.float32, device="cuda")
-    torch.cuda.synchronize()
-    t0 = time()
-    with torch.autocast(device_type='cuda', enabled=True), torch.no_grad():
-        for i in range(10):
+    x = torch.rand([batch_size, 3], dtype=torch.float32, device="cuda")
+    
+    with torch.autocast(device_type='cuda', enabled=use_amp), torch.no_grad():
+        # Warmup
+        for _ in range(5):
+            feature_density(x, rotations, scales, translations)
+        torch.cuda.synchronize()
+        
+        t0 = time()
+        for _ in range(10):
             den = feature_density(x, rotations, scales, translations)  
-    torch.cuda.synchronize()
-    t1 = time()
+        torch.cuda.synchronize()
+        t1 = time()
+    
     gb = torch.cuda.max_memory_allocated(device='cuda')/(1024**3)
     torch.cuda.reset_peak_memory_stats()
+    throughput = (batch_size * 10) / (t1 - t0)
     print(f"New encoder code took {t1-t0:0.02f}s with {gb:0.02f} GB VRAM")
-
+    print(f"New encoder throughput: {throughput:.2f} points/sec")
 
     old_encoder = AMG_encoder_old(32, 2, [64, 64, 64], 3, "default")
     old_encoder.feature_grids = torch.nn.parameter.Parameter(feature_grids.clone(), requires_grad=True)
@@ -140,34 +192,57 @@ def forward_density_test():
     del rotations, scales, translations, feature_grids, transformation_matrices
 
     torch.cuda.empty_cache()
-    torch.cuda.synchronize()
-    t0 = time()
-    with torch.autocast(device_type='cuda', enabled=True), torch.no_grad():
-        for i in range(10):
+    torch.cuda.reset_peak_memory_stats()
+    
+    with torch.autocast(device_type='cuda', enabled=use_amp), torch.no_grad():
+        # Warmup
+        for _ in range(5):
+            old_encoder.feature_density(x)
+        torch.cuda.synchronize()
+        
+        t0 = time()
+        for _ in range(10):
             den = old_encoder.feature_density(x)
-    torch.cuda.synchronize()
-    t1 = time()
+        torch.cuda.synchronize()
+        t1 = time()
+    
     gb = torch.cuda.max_memory_allocated(device='cuda')/(1024**3)
     torch.cuda.reset_peak_memory_stats()
+    throughput = (batch_size * 10) / (t1 - t0)
     print(f"Old encoder code took {t1-t0:0.02f}s with {gb:0.02f} GB VRAM")
+    print(f"Old encoder throughput: {throughput:.2f} points/sec")
+
+    # Cleanup
+    del old_encoder, x, den
+    torch.cuda.empty_cache()
+    torch.cuda.reset_peak_memory_stats()
 
 def backward_density_test():
-
+    torch.cuda.empty_cache()
+    torch.cuda.reset_peak_memory_stats()
     print("======Backward density test======")
     feature_grids, translations, scales, rotations = randomize_grids(32, 2, [64, 64, 64], 3)
 
-    x = torch.rand([2**23, 3], dtype=torch.float32, device="cuda")
+    x = torch.rand([batch_size, 3], dtype=torch.float32, device="cuda")
+    
+    # Warmup
+    for _ in range(5):
+        den = feature_density(x, rotations, scales, translations)  
+        den.sum().backward()
     torch.cuda.synchronize()
+    
     t0 = time()
-    for i in range(10):
+    for _ in range(10):
         den = feature_density(x, rotations, scales, translations)  
         den.sum().backward()
     torch.cuda.synchronize()
     t1 = time()
+    
     gb = torch.cuda.max_memory_allocated(device='cuda')/(1024**3)
     torch.cuda.reset_peak_memory_stats()
+    throughput = (batch_size * 10) / (t1 - t0)
     print(f"New encoder code took {t1-t0:0.02f}s with {gb:0.02f} GB VRAM")
-
+    print(f"New encoder throughput: {throughput:.2f} points/sec")
 
     old_encoder = AMG_encoder_old(32, 2, [64, 64, 64], 3, "default")
     old_encoder.feature_grids = torch.nn.parameter.Parameter(feature_grids.clone(), requires_grad=True)
@@ -175,19 +250,35 @@ def backward_density_test():
     old_encoder.transformation_matrices = torch.nn.parameter.Parameter(transformation_matrices.clone(), requires_grad=True)
     del rotations, scales, translations, feature_grids, transformation_matrices
     torch.cuda.empty_cache()
+    torch.cuda.reset_peak_memory_stats()
+    
+    # Warmup
+    for _ in range(5):
+        den = old_encoder.feature_density(x)
+        den.sum().backward()
     torch.cuda.synchronize()
+    
     t0 = time()
-    for i in range(10):
+    for _ in range(10):
         den = old_encoder.feature_density(x)
         den.sum().backward()
     torch.cuda.synchronize()
     t1 = time()
+    
     gb = torch.cuda.max_memory_allocated(device='cuda')/(1024**3)
     torch.cuda.reset_peak_memory_stats()
+    throughput = (batch_size * 10) / (t1 - t0)
     print(f"Old encoder code took {t1-t0:0.02f}s with {gb:0.02f} GB VRAM")
+    print(f"Old encoder throughput: {throughput:.2f} points/sec")
+
+    # Cleanup
+    del old_encoder, x, den
+    torch.cuda.empty_cache()
+    torch.cuda.reset_peak_memory_stats()
 
 def forward_full_test():
-
+    torch.cuda.empty_cache()
+    torch.cuda.reset_peak_memory_stats()
     print("======Forward model test======")
     opt = Options.get_default()
     opt['n_grids'] = 32
@@ -200,38 +291,59 @@ def forward_full_test():
     model_new = AMGSRN(opt).to(opt['device'])
     
     torch.cuda.reset_peak_memory_stats()
-    x = torch.rand([2**23, 3], dtype=torch.float32, device="cuda")
+    x = torch.rand([batch_size, 3], dtype=torch.float32, device="cuda")
     model_new(x)
-    with torch.no_grad(), torch.autocast(device_type=opt['device'], dtype=torch.float16, enabled=False):
+    with torch.no_grad(), torch.autocast(device_type=opt['device'], dtype=torch.float16, enabled=use_amp):
+        # Warmup
+        for _ in range(5):
+            model_new(x)
         torch.cuda.synchronize()
+        
         t0 = time()
-        for i in range(100):
+        for _ in range(100):
             o = model_new(x)
-    torch.cuda.synchronize()
-    t1 = time()
+        torch.cuda.synchronize()
+        t1 = time()
+    
     gb = torch.cuda.max_memory_allocated(device='cuda')/(1024**3)
     torch.cuda.reset_peak_memory_stats()
+    throughput = (batch_size * 100) / (t1 - t0)
     print(f"New model code took {t1-t0:0.02f}s with {gb:0.02f} GB VRAM")
+    print(f"New model throughput: {throughput:.2f} points/sec")
 
     del model_new
     torch.cuda.empty_cache()
+    torch.cuda.reset_peak_memory_stats()
 
     old_model : AMGSRN_old = AMGSRN_old(opt).to(opt['device'])
     torch.cuda.reset_peak_memory_stats()
     old_model(x)
-    with torch.no_grad(), torch.autocast(device_type=opt['device'], dtype=torch.float16, enabled=False):
+    with torch.no_grad(), torch.autocast(device_type=opt['device'], dtype=torch.float16, enabled=use_amp):
+        # Warmup
+        for _ in range(5):
+            old_model(x)
         torch.cuda.synchronize()
+        
         t0 = time()
-        for i in range(100):
+        for _ in range(100):
             o = old_model(x)
-    torch.cuda.synchronize()
-    t1 = time()
+        torch.cuda.synchronize()
+        t1 = time()
+    
     gb = torch.cuda.max_memory_allocated(device='cuda')/(1024**3)
     torch.cuda.reset_peak_memory_stats()
+    throughput = (batch_size * 100) / (t1 - t0)
     print(f"Old model code took {t1-t0:0.02f}s with {gb:0.02f} GB VRAM")
+    print(f"Old model throughput: {throughput:.2f} points/sec")
+
+    # Cleanup
+    del old_model, x, o
+    torch.cuda.empty_cache()
+    torch.cuda.reset_peak_memory_stats()
 
 def backward_full_test():
-
+    torch.cuda.empty_cache()
+    torch.cuda.reset_peak_memory_stats()
     print("======Backward model test======")
     opt = Options.get_default()
     opt['n_grids'] = 32
@@ -243,38 +355,63 @@ def backward_full_test():
     
     model_new = AMGSRN(opt).to(opt['device'])
     torch.cuda.reset_peak_memory_stats()
-    x = torch.rand([2**23, 3], dtype=torch.float32, device="cuda")
+    x = torch.rand([batch_size, 3], dtype=torch.float32, device="cuda")
     model_new(x)
+    
+    # Warmup
+    for _ in range(5):
+        o = model_new(x)
+        o.sum().backward()
     torch.cuda.synchronize()
+    
     t0 = time()
-    for i in range(10):
+    for _ in range(10):
         o = model_new(x)
         o.sum().backward()
     torch.cuda.synchronize()
     t1 = time()
+    
     gb = torch.cuda.max_memory_allocated(device='cuda')/(1024**3)
     torch.cuda.reset_peak_memory_stats()
+    throughput = (batch_size * 10) / (t1 - t0)
     print(f"New model code took {t1-t0:0.02f}s with {gb:0.02f} GB VRAM")
+    print(f"New model throughput: {throughput:.2f} points/sec")
 
     del model_new
     torch.cuda.empty_cache()
+    torch.cuda.reset_peak_memory_stats()
+
     old_model = AMGSRN_old(opt).to(opt['device'])
     torch.cuda.reset_peak_memory_stats()
     old_model(x)
+    
+    # Warmup
+    for _ in range(5):
+        o = old_model(x)
+        o.sum().backward()
     torch.cuda.synchronize()
+    
     t0 = time()
-    for i in range(10):
+    for _ in range(10):
         o = old_model(x)
         o.sum().backward()
     torch.cuda.synchronize()
     t1 = time()
+    
     gb = torch.cuda.max_memory_allocated(device='cuda')/(1024**3)
     torch.cuda.reset_peak_memory_stats()
+    throughput = (batch_size * 10) / (t1 - t0)
     print(f"Old model code took {t1-t0:0.02f}s with {gb:0.02f} GB VRAM")
+    print(f"Old model throughput: {throughput:.2f} points/sec")
+
+    # Cleanup
+    del old_model, x, o
+    torch.cuda.empty_cache()
+    torch.cuda.reset_peak_memory_stats()
 
 #forward_encode_test()
-#backward_encode_test()
-forward_density_test()
-#backward_density_test()
-#forward_full_test()
-#backward_full_test()
+backward_encode_test()
+# forward_density_test()
+# backward_density_test()
+# forward_full_test()
+# backward_full_test()

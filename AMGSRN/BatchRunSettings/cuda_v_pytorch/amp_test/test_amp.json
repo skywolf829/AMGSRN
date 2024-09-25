@@ -1,0 +1,22 @@
+[    
+    [ "test.py",
+        {        
+        "load_from": "supernova_cuda_noamp",
+        "tests": "psnr,throughput"
+    }],
+    [ "test.py",
+        {        
+        "load_from": "supernova_cuda_amp",
+        "tests": "psnr,throughput"
+    }],
+    [ "test.py",
+        {        
+        "load_from": "supernova_pytorch_noamp",
+        "tests": "psnr,throughput"
+    }],
+    [ "test.py",
+        {        
+        "load_from": "supernova_pytorch_amp",
+        "tests": "psnr,throughput"
+    }]
+]

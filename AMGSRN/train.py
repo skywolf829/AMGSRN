@@ -20,6 +20,8 @@ from torch.utils.data import DataLoader
 import glob
 import matplotlib.pyplot as plt
 import vtk
+import torch.profiler
+from torch.profiler import profile, record_function, ProfilerActivity
 
 project_folder_path = os.path.dirname(os.path.abspath(__file__))
 project_folder_path = os.path.join(project_folder_path, "..")
@@ -96,85 +98,117 @@ def combine_vtm_files(opt, t):
     write_pvd(vtm_files, pvd_filename, timesteps)
 
 def train_step_APMGSRN(opt, iteration, batch, dataset, model, optimizer, scheduler, writer, scaler):
-
+    prof_iter = 601
+    
+    if(iteration == prof_iter):
+        activities = [ProfilerActivity.CPU, ProfilerActivity.CUDA]
+        prof = profile(activities=activities, record_shapes=True, profile_memory=True)
+        prof = prof.__enter__()
     optimizer[0].zero_grad()                  
     x, y = batch
     
     x = x.to(opt['device'])
     y = y.to(opt['device'])
-      
-    with torch.autocast(device_type='cuda', dtype=torch.float16, enabled=False):
-        model_output = model.forward(x)
-        loss = F.mse_loss(model_output, y, reduction='none')
-        loss = loss.sum(dim=1)
-        if(opt['tv_weight'] > 0):   
-            # Calculate total variation loss for feature grids
-            tv_loss = opt['tv_weight'] * (
-                torch.pow(model.feature_grids[:, :, :, :, 1:] - model.feature_grids[:, :, :, :, :-1], 2).mean() + \
-                torch.pow(model.feature_grids[:, :, :, 1:, :] - model.feature_grids[:, :, :, :-1, :], 2).mean() + \
-                torch.pow(model.feature_grids[:, :, 1:, :, :] - model.feature_grids[:, :, :-1, :, :], 2).mean() + \
-                torch.pow(model.feature_grids[1:, :, :, :, :] - model.feature_grids[:-1, :, :, :, :], 2).mean())
-            # Add TV loss to the main loss with a weighting factor
+    
+    with torch.autocast(device_type='cuda', dtype=torch.float16, enabled=opt['use_amp']):
+        with record_function("forward"):
+            model_output = model.forward(x)
+
+        with record_function("L_rec"):
+            loss = F.mse_loss(model_output, y, reduction='none')
+            loss = loss.sum(dim=1)
+
+        if opt['tv_weight'] > 0:
+            with record_function("L_tv"):
+                # Calculate total variation loss for feature grids
+                tv_loss = opt['tv_weight'] * (
+                    torch.diff(model.feature_grids, dim=4).pow(2).mean() +
+                    torch.diff(model.feature_grids, dim=3).pow(2).mean() +
+                    torch.diff(model.feature_grids, dim=2).pow(2).mean() +
+                    torch.diff(model.feature_grids, dim=0).pow(2).mean()
+                )
         else:
             tv_loss = None
-        if(opt['model'] == "TVAMGSRN" and opt['grid_diff_weight'] > 0 and opt['save_grid_diffs'] and model.default_timestep > 0):
+
+        if opt['model'] == "TVAMGSRN" and opt['grid_diff_weight'] > 0 and opt['save_grid_diffs'] and model.default_timestep > 0:
             grid_diff_loss = opt['grid_diff_weight'] * \
                 torch.abs(model.models[model.default_timestep-1].feature_grids.detach() - \
-                         model.feature_grids).mean() 
+                        model.feature_grids).mean() 
         else:
             grid_diff_loss = None
         
-        if(opt['l1_regularization'] > 0):
-            l1_loss = opt['l1_regularization'] * model.feature_grids.abs().mean()
+        if opt['l1_regularization'] > 0:
+            with record_function("L1 reg"):
+                l1_loss = opt['l1_regularization'] * model.feature_grids.abs().mean()
         else:
             l1_loss = None
 
-    scaler.scale(loss.mean()).backward()
-    if(tv_loss is not None):
-        scaler.scale(tv_loss.mean()).backward()
-    if(grid_diff_loss is not None):
-        scaler.scale(grid_diff_loss.mean()).backward()
-    if(l1_loss is not None):
-        scaler.scale(l1_loss.mean()).backward()
+    with record_function("L_rec backward"):
+        scaler.scale(loss.mean()).backward()
 
-    if(iteration > 500 and  # let the network learn a bit first
-        optimizer[1].param_groups[0]['lr'] > 1e-8):
+    if tv_loss is not None:
+        with record_function("L_tv backward"):
+            scaler.scale(tv_loss.mean()).backward()
+
+    if grid_diff_loss is not None:
+        with record_function("L_grid_diff backward"):
+            scaler.scale(grid_diff_loss.mean()).backward()
+
+    if l1_loss is not None:
+        with record_function("L1 backward"):
+            scaler.scale(l1_loss.mean()).backward()
+
+    if iteration > 500 and optimizer[1].param_groups[0]['lr'] > 1e-8:
         optimizer[1].zero_grad() 
         
-        with torch.autocast(device_type='cuda', dtype=torch.float16, enabled=True):
-            density = model.feature_density(x)
-            density /= density.sum().detach()
-            target = torch.exp(torch.log(density+1e-16) * \
-                (loss.mean()/(loss+1e-16)))
-            target /= target.sum()
-            
-            density_loss = F.kl_div(
-                torch.log(density+1e-16), 
-                torch.log(target.detach()+1e-16), reduction='none', 
-                log_target=True)
+        with torch.autocast(device_type='cuda', dtype=torch.float16, enabled=opt['use_amp']):
+            with record_function("density"):
+                density = model.feature_density(x)
+                density /= density.sum().detach()
+
+            with record_function("target density"):
+                target = torch.exp(torch.log(density+1e-16) * \
+                    (loss.mean()/(loss+1e-16)))
+                target /= target.sum()
+            with record_function("density_loss"):
+                density_loss = F.kl_div(
+                    torch.log(density+1e-16), 
+                    torch.log(target.detach()+1e-16), reduction='none', 
+                    log_target=True)
+
+
+        with record_function("density_loss backward"):
+            scaler.scale(density_loss.mean()).backward()
         
-        scaler.scale(density_loss.mean()).backward()
-        
-        scaler.step(optimizer[1])
-        scheduler[1].step()   
+        with record_function("transform params step"):
+            scaler.step(optimizer[1])
+            scheduler[1].step()   
 
     else:
         density_loss = None
-    #optimizer[0].step()
-    scaler.step(optimizer[0])
-    scaler.update()
-    scheduler[0].step()   
-    torch.cuda.empty_cache()
+
+    with record_function("model params step"):
+        scaler.step(optimizer[0])
+        scaler.update()
+        scheduler[0].step()   
     
-    if(opt['log_every'] != 0):
+    if opt['log_every'] != 0:
         logging(writer, iteration, 
             {"Fitting loss": loss.mean().detach().item(), 
-             "Grid loss": density_loss.mean().detach().item() if density_loss is not None else None,
-             "TV loss": tv_loss.mean().detach().item() if tv_loss is not None else None,
-             "Grid diff loss": grid_diff_loss.mean().detach().item() if grid_diff_loss is not None else None,
-             "L1 loss": l1_loss.mean().detach().item() if l1_loss is not None else None,
-             "Learning rate": optimizer[0].param_groups[0]['lr']}, 
+            "Grid loss": density_loss.mean().detach().item() if density_loss is not None else None,
+            "TV loss": tv_loss.mean().detach().item() if tv_loss is not None else None,
+            "Grid diff loss": grid_diff_loss.mean().detach().item() if grid_diff_loss is not None else None,
+            "L1 loss": l1_loss.mean().detach().item() if l1_loss is not None else None,
+            "Learning rate": optimizer[0].param_groups[0]['lr']}, 
             model, opt, opt['full_shape'], dataset)
+    
+    if(iteration == prof_iter):
+        # Print profiler results
+        prof.__exit__(None, None, None)
+        print(prof.key_averages().table(sort_by="self_cuda_memory_usage", row_limit=100))        
+        # Optionally, you can save the profiler results to a file
+        prof.export_chrome_trace(os.path.join(output_folder, opt['save_name']+"_trace.json"))
+        print(f'Saved profile trace to {os.path.join(output_folder, opt["save_name"],"_trace.json")}')
 
 def train_step_vanilla(opt, iteration, batch, dataset, model, optimizer, scheduler, writer, scaler,
                        early_stopping_data=None):
@@ -185,7 +219,7 @@ def train_step_vanilla(opt, iteration, batch, dataset, model, optimizer, schedul
     x = x.to(opt['device'])
     y = y.to(opt['device'])
     
-    with torch.autocast(device_type='cuda', dtype=torch.float16):
+    with torch.autocast(device_type='cuda', dtype=torch.float16, enabled=False):
         model_output = model(x)
         loss = F.mse_loss(model_output, y, reduction='none')
     
@@ -403,6 +437,10 @@ if __name__ == '__main__':
         help='Model to load to start training from')
     parser.add_argument('--log_image',default=None, type=str2bool,
         help='Whether or not to log an image. Slows down training.')
+    parser.add_argument('--use_amp',default=None, type=str2bool,
+        help='Whether or not to use automatic mixed precision.')
+    parser.add_argument('--profile',default=None, type=str2bool,
+        help='Whether or not to profile the training.')
     parser.add_argument('--save_with_compression',default=None, type=str2bool,
         help='Use compression?')
     parser.add_argument('--save_with_compression_level',default=None, type=float,
