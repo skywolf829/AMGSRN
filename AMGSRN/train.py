@@ -102,7 +102,7 @@ def train_step_APMGSRN(opt, iteration, batch, dataset, model, optimizer, schedul
     
     if(iteration == prof_iter):
         activities = [ProfilerActivity.CPU, ProfilerActivity.CUDA]
-        prof = profile(activities=activities, record_shapes=True, profile_memory=True)
+        prof = profile(activities=activities, with_stack=True, record_shapes=True, profile_memory=True)
         prof = prof.__enter__()
     optimizer[0].zero_grad()                  
     x, y = batch

@@ -1,0 +1,74 @@
+[
+    [ "test.py",
+        {        
+            "load_from": "asteroid_comp_xl",
+            "tests": "psnr"
+        }
+    ],
+    [ "test.py",
+        {        
+            "load_from": "asteroid_comp_large",
+            "tests": "psnr"
+        }
+    ],
+    [ "test.py",
+        {        
+            "load_from": "asteroid_comp_medium",
+            "tests": "psnr"
+        }
+    ],
+    [ "test.py",
+        {        
+            "load_from": "asteroid_comp_small",
+            "tests": "psnr"
+        }
+    ],
+    [ "test.py",
+        {        
+            "load_from": "mantle_comp_xl",
+            "tests": "psnr"
+        }
+    ],
+    [ "test.py",
+        {        
+            "load_from": "mantle_comp_large",
+            "tests": "psnr"
+        }
+    ],
+    [ "test.py",
+        {        
+            "load_from": "mantle_comp_medium",
+            "tests": "psnr"
+        }
+    ],
+    [ "test.py",
+        {        
+            "load_from": "mantle_comp_small",
+            "tests": "psnr"
+        }
+    ],
+    [ "test.py",
+        {        
+            "load_from": "supernova_comp_xl",
+            "tests": "psnr"
+        }
+    ],
+    [ "test.py",
+        {        
+            "load_from": "supernova_comp_large",
+            "tests": "psnr"
+        }
+    ],
+    [ "test.py",
+        {        
+            "load_from": "supernova_comp_medium",
+            "tests": "psnr"
+        }
+    ],
+    [ "test.py",
+        {        
+            "load_from": "supernova_comp_small",
+            "tests": "psnr"
+        }
+    ]
+]

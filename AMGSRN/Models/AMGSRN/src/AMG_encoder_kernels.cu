@@ -5,6 +5,7 @@
 #include <ATen/native/cuda/KernelUtils.cuh>
 #include <cuda.h>
 #include <cuda_runtime.h>
+#include <cuda_fp16.h>
 
 #define THREADS_PER_BLOCK 256
 template <typename scalar_t>
@@ -29,11 +30,54 @@ __device__ __forceinline__ scalar_t3<scalar_t> transformPoint(
     const at::PackedTensorAccessor32<scalar_t,2,torch::RestrictPtrTraits>& translation,
     const scalar_t3<scalar_t>& pos) {
     const int offset = grid_idx * 9;  // 9 elements per 3x3 matrix
-    return make_scalar_t3<scalar_t>(
-        rotationMatrices[offset + 0] * pos.x + rotationMatrices[offset + 1] * pos.y + rotationMatrices[offset + 2] * pos.z + translation[grid_idx][0],
-        rotationMatrices[offset + 3] * pos.x + rotationMatrices[offset + 4] * pos.y + rotationMatrices[offset + 5] * pos.z + translation[grid_idx][1],
-        rotationMatrices[offset + 6] * pos.x + rotationMatrices[offset + 7] * pos.y + rotationMatrices[offset + 8] * pos.z + translation[grid_idx][2]
-    );
+    scalar_t3<scalar_t> result;
+    
+    if constexpr (std::is_same<scalar_t, float>::value) {
+        result.x = __fmaf_rn(rotationMatrices[offset + 0], pos.x,
+                    __fmaf_rn(rotationMatrices[offset + 1], pos.y,
+                        __fmaf_rn(rotationMatrices[offset + 2], pos.z, translation[grid_idx][0])));
+        
+        result.y = __fmaf_rn(rotationMatrices[offset + 3], pos.x,
+                    __fmaf_rn(rotationMatrices[offset + 4], pos.y,
+                        __fmaf_rn(rotationMatrices[offset + 5], pos.z, translation[grid_idx][1])));
+        
+        result.z = __fmaf_rn(rotationMatrices[offset + 6], pos.x,
+                    __fmaf_rn(rotationMatrices[offset + 7], pos.y,
+                        __fmaf_rn(rotationMatrices[offset + 8], pos.z, translation[grid_idx][2])));
+    } else if constexpr (std::is_same<scalar_t, c10::Half>::value) {
+        result.x = __hfma(rotationMatrices[offset + 0], pos.x,
+                    __hfma(rotationMatrices[offset + 1], pos.y,
+                        __hfma(rotationMatrices[offset + 2], pos.z, translation[grid_idx][0])));
+        
+        result.y = __hfma(rotationMatrices[offset + 3], pos.x,
+                    __hfma(rotationMatrices[offset + 4], pos.y,
+                        __hfma(rotationMatrices[offset + 5], pos.z, translation[grid_idx][1])));
+        
+        result.z = __hfma(rotationMatrices[offset + 6], pos.x,
+                    __hfma(rotationMatrices[offset + 7], pos.y,
+                        __hfma(rotationMatrices[offset + 8], pos.z, translation[grid_idx][2])));
+    } else if constexpr (std::is_same<scalar_t, double>::value) {
+        result.x = __fma_rn(rotationMatrices[offset + 0], pos.x,
+                    __fma_rn(rotationMatrices[offset + 1], pos.y,
+                        __fma_rn(rotationMatrices[offset + 2], pos.z, translation[grid_idx][0])));
+        
+        result.y = __fma_rn(rotationMatrices[offset + 3], pos.x,
+                    __fma_rn(rotationMatrices[offset + 4], pos.y,
+                        __fma_rn(rotationMatrices[offset + 5], pos.z, translation[grid_idx][1])));
+        
+        result.z = __fma_rn(rotationMatrices[offset + 6], pos.x,
+                    __fma_rn(rotationMatrices[offset + 7], pos.y,
+                        __fma_rn(rotationMatrices[offset + 8], pos.z, translation[grid_idx][2])));
+    } else {
+        result.x = rotationMatrices[offset + 0] * pos.x + rotationMatrices[offset + 1] * pos.y + 
+                   rotationMatrices[offset + 2] * pos.z + translation[grid_idx][0];
+        result.y = rotationMatrices[offset + 3] * pos.x + rotationMatrices[offset + 4] * pos.y + 
+                   rotationMatrices[offset + 5] * pos.z + translation[grid_idx][1];
+        result.z = rotationMatrices[offset + 6] * pos.x + rotationMatrices[offset + 7] * pos.y + 
+                   rotationMatrices[offset + 8] * pos.z + translation[grid_idx][2];
+    }
+    
+    return result;
 }
 
 template <typename scalar_t>
@@ -42,11 +86,110 @@ __device__ __forceinline__ scalar_t3<scalar_t> transformPoint(
     const scalar_t* translations,
     const scalar_t3<scalar_t>& pos) {
         
-    return make_scalar_t3<scalar_t>(
-        rotationMatrix[0] * pos.x + rotationMatrix[1] * pos.y + rotationMatrix[2] * pos.z + translations[0],
-        rotationMatrix[3] * pos.x + rotationMatrix[4] * pos.y + rotationMatrix[5] * pos.z + translations[1],
-        rotationMatrix[6] * pos.x + rotationMatrix[7] * pos.y + rotationMatrix[8] * pos.z + translations[2]
-    );
+    scalar_t3<scalar_t> result;
+
+    if constexpr (std::is_same<scalar_t, float>::value) {
+        result.x = __fmaf_rn(rotationMatrix[0], pos.x,
+                    __fmaf_rn(rotationMatrix[1], pos.y,
+                        __fmaf_rn(rotationMatrix[2], pos.z, translations[0])));
+        
+        result.y = __fmaf_rn(rotationMatrix[3], pos.x,
+                    __fmaf_rn(rotationMatrix[4], pos.y,
+                        __fmaf_rn(rotationMatrix[5], pos.z, translations[1])));
+        
+        result.z = __fmaf_rn(rotationMatrix[6], pos.x,
+                    __fmaf_rn(rotationMatrix[7], pos.y,
+                        __fmaf_rn(rotationMatrix[8], pos.z, translations[2])));
+    } else if constexpr (std::is_same<scalar_t, c10::Half>::value) {
+        result.x = __hfma(rotationMatrix[0], pos.x,
+                    __hfma(rotationMatrix[1], pos.y,
+                        __hfma(rotationMatrix[2], pos.z, translations[0])));
+        
+        result.y = __hfma(rotationMatrix[3], pos.x,
+                    __hfma(rotationMatrix[4], pos.y,
+                        __hfma(rotationMatrix[5], pos.z, translations[1])));
+        
+        result.z = __hfma(rotationMatrix[6], pos.x,
+                    __hfma(rotationMatrix[7], pos.y,
+                        __hfma(rotationMatrix[8], pos.z, translations[2])));
+    } else if constexpr (std::is_same<scalar_t, double>::value) {
+        result.x = __fma_rn(rotationMatrix[0], pos.x,
+                    __fma_rn(rotationMatrix[1], pos.y,
+                        __fma_rn(rotationMatrix[2], pos.z, translations[0])));
+        
+        result.y = __fma_rn(rotationMatrix[3], pos.x,
+                    __fma_rn(rotationMatrix[4], pos.y,
+                        __fma_rn(rotationMatrix[5], pos.z, translations[1])));
+        
+        result.z = __fma_rn(rotationMatrix[6], pos.x,
+                    __fma_rn(rotationMatrix[7], pos.y,
+                        __fma_rn(rotationMatrix[8], pos.z, translations[2])));
+    } else {
+        result.x = rotationMatrix[0] * pos.x + rotationMatrix[1] * pos.y + 
+                   rotationMatrix[2] * pos.z + translations[0];
+        result.y = rotationMatrix[3] * pos.x + rotationMatrix[4] * pos.y + 
+                   rotationMatrix[5] * pos.z + translations[1];
+        result.z = rotationMatrix[6] * pos.x + rotationMatrix[7] * pos.y + 
+                   rotationMatrix[8] * pos.z + translations[2];
+    }
+    
+    return result;
+}
+
+template <typename scalar_t>
+__device__ __forceinline__ scalar_t3<scalar_t> transformPoint(
+    const scalar_t* rotationMatrix,
+    const scalar_t3<scalar_t>& translations,
+    const scalar_t3<scalar_t>& pos) {
+        
+    scalar_t3<scalar_t> result;
+
+    if constexpr (std::is_same<scalar_t, float>::value) {
+        result.x = __fmaf_rn(rotationMatrix[0], pos.x,
+                    __fmaf_rn(rotationMatrix[1], pos.y,
+                        __fmaf_rn(rotationMatrix[2], pos.z, translations.x)));
+        
+        result.y = __fmaf_rn(rotationMatrix[3], pos.x,
+                    __fmaf_rn(rotationMatrix[4], pos.y,
+                        __fmaf_rn(rotationMatrix[5], pos.z, translations.y)));
+        
+        result.z = __fmaf_rn(rotationMatrix[6], pos.x,
+                    __fmaf_rn(rotationMatrix[7], pos.y,
+                        __fmaf_rn(rotationMatrix[8], pos.z, translations.z)));
+    } else if constexpr (std::is_same<scalar_t, c10::Half>::value) {
+        result.x = __hfma(rotationMatrix[0], pos.x,
+                    __hfma(rotationMatrix[1], pos.y,
+                        __hfma(rotationMatrix[2], pos.z, translations.x)));
+        
+        result.y = __hfma(rotationMatrix[3], pos.x,
+                    __hfma(rotationMatrix[4], pos.y,
+                        __hfma(rotationMatrix[5], pos.z, translations.y)));
+        
+        result.z = __hfma(rotationMatrix[6], pos.x,
+                    __hfma(rotationMatrix[7], pos.y,
+                        __hfma(rotationMatrix[8], pos.z, translations.z)));
+    } else if constexpr (std::is_same<scalar_t, double>::value) {
+        result.x = __fma_rn(rotationMatrix[0], pos.x,
+                    __fma_rn(rotationMatrix[1], pos.y,
+                        __fma_rn(rotationMatrix[2], pos.z, translations.x)));
+        
+        result.y = __fma_rn(rotationMatrix[3], pos.x,
+                    __fma_rn(rotationMatrix[4], pos.y,
+                        __fma_rn(rotationMatrix[5], pos.z, translations.y)));
+        
+        result.z = __fma_rn(rotationMatrix[6], pos.x,
+                    __fma_rn(rotationMatrix[7], pos.y,
+                        __fma_rn(rotationMatrix[8], pos.z, translations.z)));
+    } else {
+        result.x = rotationMatrix[0] * pos.x + rotationMatrix[1] * pos.y + 
+                   rotationMatrix[2] * pos.z + translations.x;
+        result.y = rotationMatrix[3] * pos.x + rotationMatrix[4] * pos.y + 
+                   rotationMatrix[5] * pos.z + translations.y;
+        result.z = rotationMatrix[6] * pos.x + rotationMatrix[7] * pos.y + 
+                   rotationMatrix[8] * pos.z + translations.z;
+    }
+    
+    return result;
 }
 
 
@@ -58,17 +201,19 @@ __device__ void trilinearInterpolate(
     const scalar_t3<scalar_t>& point,
     at::PackedTensorAccessor32<scalar_t,2,torch::RestrictPtrTraits> output) {
 
-    auto W = grid.size(2);  
-    auto H = grid.size(1);
-    auto D = grid.size(0);
-    auto C = grid.size(4);
+    auto W = grid.size(4);  
+    auto H = grid.size(3);
+    auto D = grid.size(2);
+    auto C = grid.size(1);
 
-
-    scalar_t x = (W-1) * ((point.x+1.f)/2.f);
-    scalar_t y = (H-1) * ((point.y+1.f)/2.f);
-    scalar_t z = (D-1) * ((point.z+1.f)/2.f);
+    const scalar_t one = static_cast<scalar_t>(1);
+    const scalar_t two = static_cast<scalar_t>(2);
+    scalar_t x = (W-1) * ((point.x + one) / two);
+    scalar_t y = (H-1) * ((point.y + one) / two);
+    scalar_t z = (D-1) * ((point.z + one) / two);
     
-    if(x <= -1.f || y <= -1.f || z <= -1.f || x >= W || y >= H || z >= D){
+    if(x <= static_cast<scalar_t>(-1) || y <= static_cast<scalar_t>(-1) || z <= static_cast<scalar_t>(-1) || 
+        x >= W || y >= H || z >= D){
         #pragma unroll
         for(int i = 0; i < C; ++i) 
             output[point_idx][grid_idx*C+i] = static_cast<scalar_t>(0);
@@ -86,27 +231,18 @@ __device__ void trilinearInterpolate(
     scalar_t yd = y - y0;
     scalar_t zd = z - z0;
 
-    scalar_t w000 = (1-xd)*(1-yd)*(1-zd);
-    scalar_t w001 = xd*(1-yd)*(1-zd);
-    scalar_t w010 = (1-xd)*yd*(1-zd);
-    scalar_t w011 = xd*yd*(1-zd);
-    scalar_t w100 = (1-xd)*(1-yd)*zd;
-    scalar_t w101 = xd*(1-yd)*zd;
-    scalar_t w110 = (1-xd)*yd*zd;
-    scalar_t w111 = xd*yd*zd;
-
     #pragma unroll
     for(int i = 0; i < C; ++i) {
         scalar_t result = static_cast<scalar_t>(0);
 
-        result += (z0 >= 0 && y0 >= 0 && x0 >= 0) ? grid[z0][y0][x0][grid_idx][i] * w000 : static_cast<scalar_t>(0);
-        result += (z0 >= 0 && y0 >= 0 && x1 < W) ? grid[z0][y0][x1][grid_idx][i] * w001 : static_cast<scalar_t>(0);
-        result += (z0 >= 0 && y1 < H && x0 >= 0) ? grid[z0][y1][x0][grid_idx][i] * w010 : static_cast<scalar_t>(0);
-        result += (z0 >= 0 && y1 < H && x1 < W) ? grid[z0][y1][x1][grid_idx][i] * w011 : static_cast<scalar_t>(0);
-        result += (z1 < D && y0 >= 0 && x0 >= 0) ? grid[z1][y0][x0][grid_idx][i] * w100 : static_cast<scalar_t>(0);
-        result += (z1 < D && y0 >= 0 && x1 < W) ? grid[z1][y0][x1][grid_idx][i] * w101 : static_cast<scalar_t>(0);
-        result += (z1 < D && y1 < H && x0 >= 0) ? grid[z1][y1][x0][grid_idx][i] * w110 : static_cast<scalar_t>(0);
-        result += (z1 < D && y1 < H && x1 < W) ? grid[z1][y1][x1][grid_idx][i] * w111 : static_cast<scalar_t>(0);
+        result += (z0 >= 0 && y0 >= 0 && x0 >= 0) ? grid[grid_idx][i][z0][y0][x0] * (one-xd)*(one-yd)*(one-zd) : static_cast<scalar_t>(0);
+        result += (z0 >= 0 && y0 >= 0 && x1 < W) ? grid[grid_idx][i][z0][y0][x1] * xd*(one-yd)*(one-zd) : static_cast<scalar_t>(0);
+        result += (z0 >= 0 && y1 < H && x0 >= 0) ? grid[grid_idx][i][z0][y1][x0] * (one-xd)*yd*(one-zd) : static_cast<scalar_t>(0);
+        result += (z0 >= 0 && y1 < H && x1 < W) ? grid[grid_idx][i][z0][y1][x1] * xd*yd*(one-zd) : static_cast<scalar_t>(0);
+        result += (z1 < D && y0 >= 0 && x0 >= 0) ? grid[grid_idx][i][z1][y0][x0] * (one-xd)*(one-yd)*zd : static_cast<scalar_t>(0);
+        result += (z1 < D && y0 >= 0 && x1 < W) ? grid[grid_idx][i][z1][y0][x1] * xd*(one-yd)*zd : static_cast<scalar_t>(0);
+        result += (z1 < D && y1 < H && x0 >= 0) ? grid[grid_idx][i][z1][y1][x0] * (one-xd)*yd*zd : static_cast<scalar_t>(0);
+        result += (z1 < D && y1 < H && x1 < W) ? grid[grid_idx][i][z1][y1][x1] * xd*yd*zd : static_cast<scalar_t>(0);
 
         output[point_idx][grid_idx*C+i] = result;
     }
@@ -120,10 +256,10 @@ __device__ void trilinearInterpolateBackwards(
     const scalar_t3<scalar_t>& point,
     const at::PackedTensorAccessor32<scalar_t,2,torch::RestrictPtrTraits> dL_dFeatureVector) {
     
-    auto C = dL_dFeatureGrids.size(4);
-    auto W = dL_dFeatureGrids.size(2);
-    auto H = dL_dFeatureGrids.size(1);
-    auto D = dL_dFeatureGrids.size(0);
+    auto C = dL_dFeatureGrids.size(1);
+    auto W = dL_dFeatureGrids.size(4);
+    auto H = dL_dFeatureGrids.size(3);
+    auto D = dL_dFeatureGrids.size(2);
 
     
 
@@ -170,7 +306,7 @@ __device__ void trilinearInterpolateBackwards(
         for(int j = 0; j < 8; ++j) {
             int3 c = corners[j];
             if(c.x >= 0 && c.x < D && c.y >= 0 && c.y < H && c.z >= 0 && c.z < W) {
-                gpuAtomicAdd(&dL_dFeatureGrids[c.x][c.y][c.z][grid_idx][i], dL_dFeat * w[j]);
+                gpuAtomicAdd(&dL_dFeatureGrids[grid_idx][i][c.x][c.y][c.z], dL_dFeat * w[j]);
             }
         }
     }
@@ -185,21 +321,43 @@ __global__ void encodeForwardKernel(
     at::PackedTensorAccessor32<scalar_t,2,torch::RestrictPtrTraits> output_features) {
 
     const auto point_idx = blockIdx.x * blockDim.x + threadIdx.x;
-    const auto grid_idx = blockIdx.y;
 
-    if (grid_idx >= feature_grids.size(3) || point_idx >= query_points.size(1)) return;
+    if (point_idx >= query_points.size(1)) return;
 
-    scalar_t3<scalar_t> point = make_scalar_t3<scalar_t>(query_points[0][point_idx], query_points[1][point_idx], query_points[2][point_idx]);
+    const scalar_t3<scalar_t> point = make_scalar_t3<scalar_t>(
+        query_points[0][point_idx], 
+        query_points[1][point_idx], 
+        query_points[2][point_idx]);
 
-    scalar_t3<scalar_t> point_t = transformPoint<scalar_t>(grid_idx, rotation_matrices, translations, point);
-    
-    trilinearInterpolate<scalar_t>(
-        grid_idx,
-        point_idx,
-        feature_grids,
-        point_t,
-        output_features
-    );
+    __shared__ scalar_t shared_translations[3];
+    __shared__ scalar_t shared_rotations[9];
+
+    for (int grid_idx = 0; grid_idx < feature_grids.size(0); ++grid_idx) {
+        // Load translations and rotations into shared memory
+        if (threadIdx.x < 3) {
+            shared_translations[threadIdx.x] = translations[grid_idx][threadIdx.x];
+        }
+        else if (threadIdx.x < 12) {
+            shared_rotations[threadIdx.x-3] = rotation_matrices[grid_idx*9 + threadIdx.x-3];
+        }
+        __syncthreads();
+
+        const scalar_t3<scalar_t> point_t = transformPoint<scalar_t>(
+            shared_rotations,
+            shared_translations,
+            point
+        );
+        
+        trilinearInterpolate<scalar_t>(
+            grid_idx,
+            point_idx,
+            feature_grids,
+            point_t,
+            output_features
+        );
+
+        __syncthreads();
+    }
     
 }
 
@@ -211,22 +369,32 @@ __global__ void encodeBackwardKernel(
     const at::PackedTensorAccessor32<scalar_t,5,torch::RestrictPtrTraits> feature_grids,
     const at::PackedTensorAccessor32<scalar_t,2,torch::RestrictPtrTraits> dL_dFeatureVectors,
     at::PackedTensorAccessor32<scalar_t,5,torch::RestrictPtrTraits> dL_dFeatureGrids) {
-    
+
     const auto point_idx = blockIdx.x * blockDim.x + threadIdx.x;
-    const auto grid_idx = blockIdx.y;
-    if (grid_idx >= feature_grids.size(3) || point_idx >= query_points.size(1)) return;
+    if (point_idx >= query_points.size(1)) return;
 
-    __shared__ scalar_t s_rotation[9];
-    __shared__ scalar_t s_translation[3];
-    if (threadIdx.x < 9) s_rotation[threadIdx.x] = rotation_matrices[grid_idx * 9 + threadIdx.x];
-    if (threadIdx.x < 3) s_translation[threadIdx.x] = translations[grid_idx][threadIdx.x];
-    __syncthreads();
+    __shared__ scalar_t shared_translations[3];
+    __shared__ scalar_t shared_rotations[9];
 
-    scalar_t3<scalar_t> point = make_scalar_t3<scalar_t>(query_points[0][point_idx], query_points[1][point_idx], query_points[2][point_idx]);
-    scalar_t3<scalar_t> point_t = transformPoint<scalar_t>(s_rotation, s_translation, point);
-    
-    trilinearInterpolateBackwards<scalar_t>(grid_idx, point_idx, dL_dFeatureGrids, 
-        point_t, dL_dFeatureVectors);
+    const scalar_t3<scalar_t> point = make_scalar_t3<scalar_t>(query_points[0][point_idx], query_points[1][point_idx], query_points[2][point_idx]);
+
+    for (int grid_idx = 0; grid_idx < feature_grids.size(0); ++grid_idx) {
+        // Load translations and rotations into shared memory
+        if (threadIdx.x < 3) {
+            shared_translations[threadIdx.x] = translations[grid_idx][threadIdx.x];
+        }
+        else if (threadIdx.x < 12) {
+            shared_rotations[threadIdx.x-3] = rotation_matrices[grid_idx*9 + threadIdx.x-3];
+        }
+        __syncthreads();
+
+        const scalar_t3<scalar_t> point_t = transformPoint<scalar_t>(shared_rotations, shared_translations, point);
+        
+        trilinearInterpolateBackwards<scalar_t>(grid_idx, point_idx, dL_dFeatureGrids, 
+            point_t, dL_dFeatureVectors);
+
+        __syncthreads();
+    }
     
 }
 
@@ -241,7 +409,7 @@ __global__ void densityForwardKernel(
     if (idx >= query_points.size(0)) return;
     
     scalar_t density = static_cast<scalar_t>(0.0);
-    scalar_t3<scalar_t> point = make_scalar_t3<scalar_t>(
+    const scalar_t3<scalar_t> point = make_scalar_t3<scalar_t>(
         query_points[idx][0],
         query_points[idx][1],
         query_points[idx][2]
@@ -249,17 +417,13 @@ __global__ void densityForwardKernel(
 
     for(int i = 0; i < translations.size(0); ++i){
         const scalar_t* rotation_matrix = &rotation_matrices[i * 9];
-        scalar_t3<scalar_t> translation = make_scalar_t3<scalar_t>(
+        const scalar_t3<scalar_t> translation = make_scalar_t3<scalar_t>(
             translations[i][0],
             translations[i][1],
             translations[i][2]
         );
 
-        scalar_t3<scalar_t> point_t = make_scalar_t3<scalar_t>(
-            rotation_matrix[0] * point.x + rotation_matrix[1] * point.y + rotation_matrix[2] * point.z + translation.x,
-            rotation_matrix[3] * point.x + rotation_matrix[4] * point.y + rotation_matrix[5] * point.z + translation.y,
-            rotation_matrix[6] * point.x + rotation_matrix[7] * point.y + rotation_matrix[8] * point.z + translation.z
-        );
+        const scalar_t3<scalar_t> point_t = transformPoint<scalar_t>(rotation_matrix, translation, point);
 
         scalar_t det = rotation_matrix[0] * (rotation_matrix[4]*rotation_matrix[8]-rotation_matrix[5]*rotation_matrix[7]) -
                        rotation_matrix[1] * (rotation_matrix[3]*rotation_matrix[8]-rotation_matrix[5]*rotation_matrix[6]) +
@@ -500,46 +664,39 @@ __global__ void combineTransformationsKernelBackward(
 
 template <typename scalar_t>
 __global__ void quaternionScaleToRotationMatrix(
-    const at::PackedTensorAccessor32<scalar_t,2,at::RestrictPtrTraits> quaternions,
-    const at::PackedTensorAccessor32<scalar_t,2,at::RestrictPtrTraits> scales,
+    const at::PackedTensorAccessor32<scalar_t,2,torch::RestrictPtrTraits> quaternions,
+    const at::PackedTensorAccessor32<scalar_t,2,torch::RestrictPtrTraits> scales,
     scalar_t* output) {
-        
-    auto idx = blockIdx.x * blockDim.x + threadIdx.x;
-    if (idx >= quaternions.size(0)) return;
 
-    scalar_t qx = quaternions[idx][0];
-    scalar_t qy = quaternions[idx][1];
-    scalar_t qz = quaternions[idx][2];
-    scalar_t qw = quaternions[idx][3];
-    scalar_t sx = scales[idx][0];
-    scalar_t sy = scales[idx][1];
-    scalar_t sz = scales[idx][2];
+    __shared__ scalar_t s_quaternions[4];
+    __shared__ scalar_t s_scales[3];
 
-    scalar_t wx = qx * qw;
-    scalar_t wy = qy * qw;
-    scalar_t wz = qz * qw;
+    const int idx = blockIdx.x; // grid idx
+    const int tid = threadIdx.x; // thread idx
 
-    scalar_t xx = qx * qx;
-    scalar_t xy = qx * qy;
-    scalar_t xz = qx * qz;
+    // Load data into shared memory
+    if (tid < 4) s_quaternions[tid] = quaternions[idx][tid];
+    else if (tid < 7) s_scales[tid-4] = scales[idx][tid-4];
+    __syncthreads();
 
-    scalar_t yy = qy * qy;
-    scalar_t yz = qy * qz;
-    scalar_t zz = qz * qz;
+    scalar_t qx = s_quaternions[0], qy = s_quaternions[1], qz = s_quaternions[2], qw = s_quaternions[3];
+    scalar_t sx = s_scales[0], sy = s_scales[1], sz = s_scales[2];
 
-    auto matrix_offset = idx * 9;  // 3x3 matrix for each grid
+    scalar_t wx = qx * qw, wy = qy * qw, wz = qz * qw;
+    scalar_t xx = qx * qx, xy = qx * qy, xz = qx * qz;
+    scalar_t yy = qy * qy, yz = qy * qz, zz = qz * qz;
 
-    output[matrix_offset + 0] = sx * (1 - 2 * (yy + zz));
-    output[matrix_offset + 1] = sy * (2 * (xy - wz));
-    output[matrix_offset + 2] = sz * (2 * (xz + wy));
+    // Compute output values
+    if (tid == 0) output[idx * 9 + 0] = sx * (1 - 2 * (yy + zz));
+    else if (tid == 1) output[idx * 9 + 1] = sy * (2 * (xy - wz));
+    else if (tid == 2) output[idx * 9 + 2] = sz * (2 * (xz + wy));
+    else if (tid == 3) output[idx * 9 + 3] = sx * (2 * (xy + wz));
+    else if (tid == 4) output[idx * 9 + 4] = sy * (1 - 2 * (xx + zz));
+    else if (tid == 5) output[idx * 9 + 5] = sz * (2 * (yz - wx));
+    else if (tid == 6) output[idx * 9 + 6] = sx * (2 * (xz - wy));
+    else if (tid == 7) output[idx * 9 + 7] = sy * (2 * (yz + wx));
+    else if (tid == 8) output[idx * 9 + 8] = sz * (1 - 2 * (xx + yy));
 
-    output[matrix_offset + 3] = sx * (2 * (xy + wz));
-    output[matrix_offset + 4] = sy * (1 - 2 * (xx + zz));
-    output[matrix_offset + 5] = sz * (2 * (yz - wx));    
-
-    output[matrix_offset + 6] = sx * (2 * (xz - wy));
-    output[matrix_offset + 7] = sy * (2 * (yz + wx));
-    output[matrix_offset + 8] = sz * (1 - 2 * (xx + yy));
 }
 
 
@@ -551,57 +708,63 @@ __global__ void rotationMatrixBackward(
     at::PackedTensorAccessor32<scalar_t,2,torch::RestrictPtrTraits> dScales,
     const scalar_t* dMatrix) {
 
-    auto idx = blockIdx.x * blockDim.x + threadIdx.x;
-    if (idx >= quaternions.size(0)) return;
+    __shared__ scalar_t s_quaternions[4];
+    __shared__ scalar_t s_scales[3];
+    __shared__ scalar_t s_dMatrix[9];
 
-    scalar_t qx = quaternions[idx][0];
-    scalar_t qy = quaternions[idx][1];
-    scalar_t qz = quaternions[idx][2];
-    scalar_t qw = quaternions[idx][3];
-    scalar_t sx = scales[idx][0];
-    scalar_t sy = scales[idx][1];
-    scalar_t sz = scales[idx][2];
+    const int idx = blockIdx.x; // grid idx
+    const int tid = threadIdx.x; // thread idx
 
-    scalar_t wx = qx * qw;
-    scalar_t wy = qy * qw;
-    scalar_t wz = qz * qw;
-    scalar_t xx = qx * qx;
-    scalar_t xy = qx * qy;
-    scalar_t xz = qx * qz;
-    scalar_t yy = qy * qy;
-    scalar_t yz = qy * qz;
-    scalar_t zz = qz * qz;
+    // Load data into shared memory
+    if (tid < 4) s_quaternions[tid] = quaternions[idx][tid];
+    else if (tid < 7) s_scales[tid-4] = scales[idx][tid-4];
+    else if (tid < 18) s_dMatrix[tid-11] = dMatrix[idx * 9 + tid-11];
+    __syncthreads();
 
-    int matrix_offset = idx * 9;  // 3x3 matrix for each grid
+    scalar_t qx = s_quaternions[0], qy = s_quaternions[1], qz = s_quaternions[2], qw = s_quaternions[3];
+    scalar_t sx = s_scales[0], sy = s_scales[1], sz = s_scales[2];
 
-    dScales[idx][0] = 
-        (dMatrix[matrix_offset + 0]*(1 - 2 * (yy + zz))) +
-        (dMatrix[matrix_offset + 3]*(2 * (xy + wz)))+
-        (dMatrix[matrix_offset + 6]*(2 * (xz - wy)));
-    dScales[idx][1] = 
-        (dMatrix[matrix_offset + 1]*(2 * (xy - wz))) +
-        (dMatrix[matrix_offset + 4]*(1 - 2 * (xx + zz)))+
-        (dMatrix[matrix_offset + 7]*(2 * (yz + wx)));
-    dScales[idx][2] = 
-        (dMatrix[matrix_offset + 2]*(2 * (xz + wy))) +
-        (dMatrix[matrix_offset + 5]*(2 * (yz - wx)))+
-        (dMatrix[matrix_offset + 8]*(1 - 2 * (xx + yy)));    
+    scalar_t wx = qx * qw, wy = qy * qw, wz = qz * qw;
+    scalar_t xx = qx * qx, xy = qx * qy, xz = qx * qz;
+    scalar_t yy = qy * qy, yz = qy * qz, zz = qz * qz;
 
-    dQuaternions[idx][0] = -4 * qx * (dMatrix[matrix_offset + 4] * sx + dMatrix[matrix_offset + 8] * sz) +
-                            2 * qy * (dMatrix[matrix_offset + 1] * sy + dMatrix[matrix_offset + 3] * sx) +
-                            2 * qz * (dMatrix[matrix_offset + 2] * sz + dMatrix[matrix_offset + 6] * sx) + 
-                            2 * qw * (dMatrix[matrix_offset + 5] * -sz + dMatrix[matrix_offset + 7] * sy);
-    dQuaternions[idx][1] =  2 * qx * (dMatrix[matrix_offset + 1] * sy + dMatrix[matrix_offset + 3] * sx) +
-                            -4 * qy * (dMatrix[matrix_offset + 0] * sx + dMatrix[matrix_offset + 8] * sz) +
-                            2 * qz * (dMatrix[matrix_offset + 5] * sz + dMatrix[matrix_offset + 7] * sy) + 
-                            2 * qw * (dMatrix[matrix_offset + 2] * sz + dMatrix[matrix_offset + 6] * -sx);
-    dQuaternions[idx][2] =  2 * qx * (dMatrix[matrix_offset + 2] * sz + dMatrix[matrix_offset + 6] * sx) +
-                            2 * qy * (dMatrix[matrix_offset + 5] * sz + dMatrix[matrix_offset + 7] * sy) +
-                            -4 * qz * (dMatrix[matrix_offset + 0] * sx + dMatrix[matrix_offset + 4] * sy) + 
-                            2 * qw * (dMatrix[matrix_offset + 1] * -sy + dMatrix[matrix_offset + 3] * sx);
-    dQuaternions[idx][3] =  2 * qx * (dMatrix[matrix_offset + 5] * -sz + dMatrix[matrix_offset + 7] * sy) +
-                            2 * qy * (dMatrix[matrix_offset + 2] * sz + dMatrix[matrix_offset + 6] * -sx) +
-                            2 * qz * (dMatrix[matrix_offset + 1] * -sy + dMatrix[matrix_offset + 3] * sx); 
+    // Compute gradients
+    if (tid == 0) {
+        dScales[idx][0] = 
+            (s_dMatrix[0] * (1 - 2 * (yy + zz))) +
+            (s_dMatrix[3] * (2 * (xy + wz))) +
+            (s_dMatrix[6] * (2 * (xz - wy)));
+    } else if (tid == 1) {
+        dScales[idx][1] = 
+            (s_dMatrix[1] * (2 * (xy - wz))) +
+            (s_dMatrix[4] * (1 - 2 * (xx + zz))) +
+            (s_dMatrix[7] * (2 * (yz + wx)));
+    } else if (tid == 2) {
+        dScales[idx][2] = 
+            (s_dMatrix[2] * (2 * (xz + wy))) +
+            (s_dMatrix[5] * (2 * (yz - wx))) +
+            (s_dMatrix[8] * (1 - 2 * (xx + yy)));
+    }
+    else if (tid == 3) {
+        dQuaternions[idx][0] = -4 * qx * (s_dMatrix[4] * sx + s_dMatrix[8] * sz) +
+                                2 * qy * (s_dMatrix[1] * sy + s_dMatrix[3] * sx) +
+                                2 * qz * (s_dMatrix[2] * sz + s_dMatrix[6] * sx) + 
+                                2 * qw * (s_dMatrix[5] * -sz + s_dMatrix[7] * sy);
+    } else if (tid == 4) {
+        dQuaternions[idx][1] =  2 * qx * (s_dMatrix[1] * sy + s_dMatrix[3] * sx) +
+                                -4 * qy * (s_dMatrix[0] * sx + s_dMatrix[8] * sz) +
+                                2 * qz * (s_dMatrix[5] * sz + s_dMatrix[7] * sy) + 
+                                2 * qw * (s_dMatrix[2] * sz + s_dMatrix[6] * -sx);
+    } else if (tid == 5) {
+        dQuaternions[idx][2] =  2 * qx * (s_dMatrix[2] * sz + s_dMatrix[6] * sx) +
+                                2 * qy * (s_dMatrix[5] * sz + s_dMatrix[7] * sy) +
+                                -4 * qz * (s_dMatrix[0] * sx + s_dMatrix[4] * sy) + 
+                                2 * qw * (s_dMatrix[1] * -sy + s_dMatrix[3] * sx);
+    } else if (tid == 6) {
+        dQuaternions[idx][3] =  2 * qx * (s_dMatrix[5] * -sz + s_dMatrix[7] * sy) +
+                                2 * qy * (s_dMatrix[2] * sz + s_dMatrix[6] * -sx) +
+                                2 * qz * (s_dMatrix[1] * -sy + s_dMatrix[3] * sx);
+    }
 }
 
 void launch_create_transformation_matrices(
@@ -661,15 +824,17 @@ void launch_encode_forward(
     scalar_t* rotation_matrices;
     cudaMalloc(&rotation_matrices, num_grids * 3 * 3 * sizeof(scalar_t));
 
-    auto blocksPerGrid = (num_grids + THREADS_PER_BLOCK - 1) / THREADS_PER_BLOCK;
-    quaternionScaleToRotationMatrix<<<blocksPerGrid, THREADS_PER_BLOCK>>>(
+    dim3 threadsPerBlock(9);
+    dim3 numBlocks(num_grids);
+    quaternionScaleToRotationMatrix<<<numBlocks, threadsPerBlock>>>(
         rotations.packed_accessor32<scalar_t,2,torch::RestrictPtrTraits>(),
         scales.packed_accessor32<scalar_t,2,torch::RestrictPtrTraits>(),
         rotation_matrices
     );
-
-    dim3 threadsPerBlock(THREADS_PER_BLOCK, 1);
-    dim3 numBlocks((num_points + THREADS_PER_BLOCK - 1) / THREADS_PER_BLOCK, num_grids);
+    threadsPerBlock.x = THREADS_PER_BLOCK;
+    threadsPerBlock.y = 1;
+    numBlocks.x = (num_points + THREADS_PER_BLOCK - 1) / THREADS_PER_BLOCK;
+    numBlocks.y = 1;
     encodeForwardKernel<<<numBlocks, threadsPerBlock>>>(
         query_points.packed_accessor32<scalar_t,2,torch::RestrictPtrTraits>(),
         rotation_matrices,
@@ -699,15 +864,18 @@ void launch_encode_backward(
     scalar_t* rotation_matrices;
     cudaMalloc(&rotation_matrices, num_grids * 3 * 3 * sizeof(scalar_t));
 
-    auto blocksPerGrid = (num_grids + THREADS_PER_BLOCK - 1) / THREADS_PER_BLOCK;
-    quaternionScaleToRotationMatrix<<<blocksPerGrid, THREADS_PER_BLOCK>>>(
+    dim3 threadsPerBlock(9);
+    dim3 numBlocks(num_grids);
+    quaternionScaleToRotationMatrix<<<numBlocks, threadsPerBlock>>>(
         rotations.packed_accessor32<scalar_t,2,torch::RestrictPtrTraits>(),
         scales.packed_accessor32<scalar_t,2,torch::RestrictPtrTraits>(),
         rotation_matrices
     );
 
-    dim3 threadsPerBlock(THREADS_PER_BLOCK, 1);
-    dim3 numBlocks((num_points + THREADS_PER_BLOCK - 1) / THREADS_PER_BLOCK, num_grids);
+    threadsPerBlock.x = THREADS_PER_BLOCK;
+    threadsPerBlock.y = 1;
+    numBlocks.x = (num_points + THREADS_PER_BLOCK - 1) / THREADS_PER_BLOCK;
+    numBlocks.y = 1;
     encodeBackwardKernel<<<numBlocks, threadsPerBlock>>>(
         query_points.packed_accessor32<scalar_t,2,torch::RestrictPtrTraits>(),
         rotation_matrices,
@@ -736,14 +904,15 @@ void launch_density_forward(
     scalar_t* rotation_matrices;
     cudaMalloc(&rotation_matrices, num_grids * 3 * 3 * sizeof(scalar_t));
 
-    auto blocksPerGrid = (num_grids + THREADS_PER_BLOCK - 1) / THREADS_PER_BLOCK;
-    quaternionScaleToRotationMatrix<scalar_t><<<blocksPerGrid, THREADS_PER_BLOCK>>>(
+    dim3 threadsPerBlock(9);
+    dim3 numBlocks(num_grids);
+    quaternionScaleToRotationMatrix<scalar_t><<<numBlocks, threadsPerBlock>>>(
         rotations.packed_accessor32<scalar_t,2,torch::RestrictPtrTraits>(),
         scales.packed_accessor32<scalar_t,2,torch::RestrictPtrTraits>(),
         rotation_matrices
     );
 
-    blocksPerGrid = (num_points + THREADS_PER_BLOCK - 1) / THREADS_PER_BLOCK;
+    dim3 blocksPerGrid = (num_points + THREADS_PER_BLOCK - 1) / THREADS_PER_BLOCK;
     densityForwardKernel<scalar_t><<<blocksPerGrid, THREADS_PER_BLOCK>>>(
         query_points.packed_accessor32<scalar_t,2,torch::RestrictPtrTraits>(),
         rotation_matrices,
@@ -776,15 +945,15 @@ void launch_density_backward(
     cudaMalloc(&dL_dRotation_matrices, num_grids * 3 * 3 * sizeof(scalar_t));
     cudaMemset(dL_dRotation_matrices, 0, num_grids * 3 * 3 * sizeof(scalar_t));
 
-    auto blocksPerGrid = (num_grids + THREADS_PER_BLOCK - 1) / THREADS_PER_BLOCK;
-
-    quaternionScaleToRotationMatrix<scalar_t><<<blocksPerGrid, THREADS_PER_BLOCK>>>(
+    dim3 threadsPerBlock(9);
+    dim3 numBlocks(num_grids);
+    quaternionScaleToRotationMatrix<scalar_t><<<numBlocks, threadsPerBlock>>>(
         rotations.packed_accessor32<scalar_t,2,torch::RestrictPtrTraits>(),
         scales.packed_accessor32<scalar_t,2,torch::RestrictPtrTraits>(),
         rotation_matrices
     );
     
-    blocksPerGrid = (num_points + THREADS_PER_BLOCK - 1) / THREADS_PER_BLOCK;
+    dim3 blocksPerGrid = (num_points + THREADS_PER_BLOCK - 1) / THREADS_PER_BLOCK;
     densityBackwardKernel<scalar_t><<<blocksPerGrid, THREADS_PER_BLOCK, num_grids*12*sizeof(float)>>>(
         query_points.packed_accessor32<scalar_t,2,torch::RestrictPtrTraits>(),
         rotation_matrices,
@@ -794,8 +963,11 @@ void launch_density_backward(
         dL_dTranslations.packed_accessor32<scalar_t,2,torch::RestrictPtrTraits>()
     );
 
-    blocksPerGrid = (num_grids + THREADS_PER_BLOCK - 1) / THREADS_PER_BLOCK;
-    rotationMatrixBackward<scalar_t><<<blocksPerGrid, THREADS_PER_BLOCK>>>(
+    threadsPerBlock.x = 18;
+    threadsPerBlock.y = 1;
+    numBlocks.x = num_grids;
+    numBlocks.y = 1;
+    rotationMatrixBackward<scalar_t><<<numBlocks, threadsPerBlock>>>(
         rotations.packed_accessor32<scalar_t,2,torch::RestrictPtrTraits>(),
         scales.packed_accessor32<scalar_t,2,torch::RestrictPtrTraits>(),
         dL_dRotations.packed_accessor32<scalar_t,2,torch::RestrictPtrTraits>(),

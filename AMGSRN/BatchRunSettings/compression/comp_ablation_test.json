@@ -1,0 +1,32 @@
+[
+    [ "test.py",
+        {        
+            "load_from": "supernova_comp_ablation_all",
+            "tests": "psnr"
+        }
+    ],
+    [ "test.py",
+        {        
+            "load_from": "supernova_comp_ablation_TV",
+            "tests": "psnr"
+        }
+    ],
+    [ "test.py",
+        {        
+            "load_from": "supernova_comp_ablation_L1",
+            "tests": "psnr"
+        }
+    ],
+    [ "test.py",
+        {        
+            "load_from": "supernova_comp_ablation_none",
+            "tests": "psnr"
+        }
+    ],
+    [ "test.py",
+        {        
+            "load_from": "supernova_comp_ablation_nocomp",
+            "tests": "psnr"
+        }
+    ]
+]

@@ -27,12 +27,12 @@ class EncodeCoordinates(torch.autograd.Function):
     def forward(ctx, query_coordinates : torch.Tensor, rotations : torch.Tensor, 
                 scales : torch.Tensor, translations : torch.Tensor, feature_grids : torch.Tensor):
         permuted_query = query_coordinates.permute(1, 0).contiguous()
-        permuted_grids = feature_grids.permute(2, 3, 4, 0, 1).contiguous()
+        
         feature_vectors = _C.encodeForward(permuted_query, rotations, 
-                                        scales, translations, permuted_grids)
+                                        scales, translations, feature_grids)
         if any(ctx.needs_input_grad[1:]):  # Check if any input requires gradient
             ctx.save_for_backward(permuted_query, rotations, 
-                        scales, translations, permuted_grids)
+                        scales, translations, feature_grids)
         return feature_vectors
 
     @staticmethod
@@ -47,12 +47,10 @@ class EncodeCoordinates(torch.autograd.Function):
         grad_feature_grids = _C.encodeBackward(query_coordinates, 
             rotations, scales, translations, feature_grids, grad_output)
         
-        grad_feature_grids = grad_feature_grids.permute(3, 4, 0, 1, 2).contiguous()
         return None, None, None, None, grad_feature_grids
 
 class FeatureDensity(torch.autograd.Function):
     @staticmethod
-    @custom_fwd(device_type="cuda") # This one doesn't benefit from float16, actually hurts performance
     def forward(ctx, query_coordinates, rotations, scales, translations):
         density = _C.featureDensityForward(query_coordinates, rotations, 
                                            scales, translations)
@@ -64,7 +62,6 @@ class FeatureDensity(torch.autograd.Function):
         return density
 
     @staticmethod
-    @custom_bwd(device_type="cuda")
     def backward(ctx, grad_output):
         query_coordinates, rotations, \
             scales, translations = ctx.saved_tensors

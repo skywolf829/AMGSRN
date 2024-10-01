@@ -1,7 +1,7 @@
 [
     [ "train.py",
         {        
-            "save_name": "asteroid_medium",
+            "save_name": "asteroid_tv",
             "model": "TVAMGSRN",
             "data": "asteroid",
             "n_features": 2,
@@ -9,24 +9,36 @@
             "feature_grid_shape": "32,32,32",
             "n_layers": 2,
             "nodes_per_layer": 32,
-            "log_every": 250,
-            "log_features_every": 500,
-            "lr": 0.01,
+            "log_every": 0,
+            "log_features_every": 0,
             "iterations": 30000
     }],
     [ "train.py",
         {        
-            "save_name": "mantle_small",
+            "save_name": "mantle_tv",
             "model": "TVAMGSRN",
             "data": "mantle",
             "n_features": 2,
             "n_grids": 32,
-            "feature_grid_shape": "32,16,16",
+            "feature_grid_shape": "32,32,32",
             "n_layers": 2,
             "nodes_per_layer": 32,
-            "log_every": 250,
-            "log_features_every": 500,
-            "lr": 0.01,
+            "log_every": 0,
+            "log_features_every": 0,
+            "iterations": 30000
+    }],    
+    [ "train.py",
+        {        
+            "save_name": "supernova_tv",
+            "model": "TVAMGSRN",
+            "data": "supernova",
+            "n_features": 2,
+            "n_grids": 32,
+            "feature_grid_shape": "32,32,32",
+            "n_layers": 2,
+            "nodes_per_layer": 32,
+            "log_every": 0,
+            "log_features_every": 0,
             "iterations": 30000
     }]
 ]

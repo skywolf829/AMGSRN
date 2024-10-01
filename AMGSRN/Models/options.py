@@ -62,7 +62,7 @@ class Options():
         opt['use_amp']                              = False
         opt['compressor_used']                      = "none"
         opt['save_with_compression']                = True
-        opt['save_with_compression_level']          = 0.01
+        opt['save_with_compression_level']          = 0.001
         opt['save_grid_diffs']                      = False
         return opt
 
