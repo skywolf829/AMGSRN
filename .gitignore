@@ -166,3 +166,7 @@ cython_debug/
 /Output
 /SavedModels
 /tensorboard
+*.sz
+*.sz3
+*.zfp
+*.out
