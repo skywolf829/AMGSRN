@@ -98,7 +98,7 @@ def combine_vtm_files(opt, t):
     write_pvd(vtm_files, pvd_filename, timesteps)
 
 def train_step_APMGSRN(opt, iteration, batch, dataset, model, optimizer, scheduler, writer, scaler):
-    prof_iter = 601
+    prof_iter = -1
     
     if(iteration == prof_iter):
         activities = [ProfilerActivity.CPU, ProfilerActivity.CUDA]
@@ -306,7 +306,7 @@ def train_model(model, dataset, opt):
         
         writer.add_figure('Transform Parameters Histogram', fig, global_step=iteration)
         plt.close(fig)
-    print(f"Model completed training after {int(mins)}m {sec_passed%60:0.02f}s")
+    #print(f"Model completed training after {int(mins)}m {sec_passed%60:0.02f}s")
 
     
     #writer.add_graph(model, torch.zeros([1, 3], device=opt['device'], dtype=torch.float32))
@@ -334,7 +334,6 @@ def train(model, dataset, opt):
         if(opt['log_features_every'] > 0):
             combine_vtm_files(opt, t)
     
-    save_model(model, opt)
 
 
 
@@ -495,5 +494,6 @@ if __name__ == '__main__':
     start_time = time.time()
     
     train(model, dataset, opt)
+    save_model(model, opt)
     
 

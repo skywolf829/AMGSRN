@@ -90,7 +90,7 @@ def main():
     args = parser.parse_args()
 
     compressors = ['sz3', 'zfp']  # tthresh is slow
-    error_bounds = np.logspace(-5, -0.699, 10)  # 10 points from 0.00001 to 0.2
+    error_bounds = np.logspace(-3, -0.39794, num=10)  # 10 points from 0.001 to 0.4
 
     all_results = []
 

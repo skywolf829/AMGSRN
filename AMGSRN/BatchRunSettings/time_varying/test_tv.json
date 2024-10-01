@@ -6,7 +6,7 @@
     }],
     [ "test.py",
         {        
-        "load_from": "suprnova_tv",
+        "load_from": "supernova_tv",
         "tests": "psnr"
     }],
     [ "test.py",

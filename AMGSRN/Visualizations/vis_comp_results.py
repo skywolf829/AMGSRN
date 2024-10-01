@@ -2,7 +2,6 @@ import os
 import pandas as pd
 import matplotlib.pyplot as plt
 import glob
-import seaborn as sns
 import numpy as np
 
 # Set the style for a clean and modern look

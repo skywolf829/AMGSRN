@@ -56,7 +56,7 @@ def model_reconstruction_chunked(model, opt, timestep):
                     x_range = x_ind_end-x_ind
                     
                     opt['extents'] = f"{z_ind},{z_ind_end},{y_ind},{y_ind_end},{x_ind},{x_ind_end}"
-                    print(f"Extents: {z_ind},{z_ind_end},{y_ind},{y_ind_end},{x_ind},{x_ind_end}")
+                    #print(f"Extents: {z_ind},{z_ind_end},{y_ind},{y_ind_end},{x_ind},{x_ind_end}")
                                                                 
                     grid = [z_range, y_range, x_range]
                     coord_grid = make_coord_grid(grid, 
@@ -87,12 +87,8 @@ def model_reconstruction_chunked(model, opt, timestep):
                     output[0,:,z_ind:z_ind_end,y_ind:y_ind_end,x_ind:x_ind_end] = out_tmp
 
                     print(f"Chunk {z_ind},{z_ind_end},{y_ind},{y_ind_end},{x_ind},{x_ind_end}")
-        
-    create_path(os.path.join(output_folder, "Reconstruction"))
-    tensor_to_cdf(output, 
-        os.path.join(output_folder, 
-        "Reconstruction", opt['save_name']+"_timestep_"+str(timestep)+".nc"))
-    
+    return output
+
 def test_psnr(model, dataset, opt):
     
     # Load the reference data
@@ -160,7 +156,7 @@ def test_psnr_chunked(model, opt):
                     x_range = x_ind_end-x_ind
                     
                     opt['extents'] = f"{z_ind},{z_ind_end},{y_ind},{y_ind_end},{x_ind},{x_ind_end}"
-                    print(f"Extents: {z_ind},{z_ind_end},{y_ind},{y_ind_end},{x_ind},{x_ind_end}")
+                    #print(f"Extents: {z_ind},{z_ind_end},{y_ind},{y_ind_end},{x_ind},{x_ind_end}")
                     dataset = Dataset(opt)
                     dataset.set_default_timestep(model.get_default_timestep())
                     dataset.load_timestep(model.get_default_timestep())
@@ -204,7 +200,7 @@ def test_psnr_chunked(model, opt):
 
                     data **= 2
                     SSE += data.sum()
-                    print(f"Chunk {z_ind},{z_ind_end},{y_ind},{y_ind_end},{x_ind},{x_ind_end} SSE: {data.sum()}")
+                    #print(f"Chunk {z_ind},{z_ind_end},{y_ind},{y_ind_end},{x_ind},{x_ind_end} SSE: {data.sum()}")
                     del coord_grid, output, data
                     torch.cuda.empty_cache()
         
@@ -903,7 +899,11 @@ def compress_and_test(model, test_model, opt, error_bound_or_precision, compress
 
 def perform_tests(model, tests, opt, timestep):
     if("reconstruction" in tests):
-        model_reconstruction_chunked(model, opt, timestep),
+        output = model_reconstruction_chunked(model, opt, timestep)
+        create_path(os.path.join(output_folder, "Reconstruction"))
+        tensor_to_cdf(output, 
+            os.path.join(output_folder, 
+            "Reconstruction", opt['save_name']+"_timestep_"+str(timestep)+".nc"))
     if("feature_locations" in tests):
         feature_locations(model, opt)
     if("error_volume" in tests):
