@@ -20,8 +20,7 @@ dependencies = [
     "vtk==9.3.1",
     "ninja==1.11.1.1",
     "onnx==1.16.2",
-    "tensorrt==10.4.0",
-    "tyro==0.5.1"
+    "tensorrt==10.4.0"
 ]
 
 [project.optional-dependencies]
@@ -31,7 +30,8 @@ renderer = [
     "pyquaternion==0.9.9",
     "PyQt5==5.15.11",
     "superqt==0.6.7",
-    "pyqtgraph==0.13.7"
+    "pyqtgraph==0.13.7",
+    "nerfacc @ git+https://github.com/nerfstudio-project/nerfacc.git"
 ]
 tcnn = [
     #"git+https://github.com/NVlabs/tiny-cuda-nn/#subdirectory=bindings/torch",

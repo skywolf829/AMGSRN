@@ -1,7 +1,7 @@
 [    
     [ "test.py",
         {        
-        "load_from": "supernova_tv",
+        "load_from": "supernova_tv_no_last_timestep_init",
         "tests": "psnr"
     }]
 ]

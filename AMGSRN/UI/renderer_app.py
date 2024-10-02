@@ -10,7 +10,7 @@ from PyQt5.QtCore import QSize, Qt, QTimer, QMutex
 from PyQt5.QtGui import QImage, QPixmap, QPalette, QColor, QIcon
 from PyQt5.QtWidgets import QApplication, QMainWindow, QPushButton, \
     QWidget, QLabel, QHBoxLayout, QVBoxLayout, QStackedLayout, \
-    QComboBox, QSlider, QFileDialog
+    QComboBox, QSlider, QFileDialog, QColorDialog
 from superqt import QRangeSlider
 from PyQt5.QtCore import QObject, QThread, pyqtSignal, QEvent, Qt
 from AMGSRN.renderer import Camera, Scene, TransferFunction, RawData
@@ -243,8 +243,20 @@ class MainWindow(QMainWindow):
         self.view_xy_button.setFixedHeight(25)
         self.view_xy_button.clicked.connect(lambda: self.render_worker.view_xy.emit())
         
+        self.density_toggle = QPushButton("Toggle density")
+        self.density_toggle.setFixedHeight(25)
+        self.density_toggle.clicked.connect(self.toggle_density)
+        
         self.transfer_function_box = QVBoxLayout()
         self.tf_editor = TransferFunctionEditor(self)
+        self.background_color_box = QHBoxLayout()
+        self.background_color_box.addWidget(QLabel("Background Color:"))
+        self.background_color_button = QPushButton()
+        self.background_color_button.setFixedSize(30, 30)
+        self.background_color_button.setStyleSheet("background-color: white;")
+        self.background_color_button.clicked.connect(self.choose_background_color)
+        self.background_color_box.addWidget(self.background_color_button)
+        self.transfer_function_box.addLayout(self.background_color_box)
 
         self.tf_rescale_slider_box = QHBoxLayout()  
         self.tf_rescale_slider_mintxt = QLabel(f"data range: {0:3}%")
@@ -271,10 +283,6 @@ class MainWindow(QMainWindow):
         self.timestep_slider.valueChanged.connect(self.change_timestep)
         #self.timestep_slider.sliderReleased.connect(self.change_timestep)
         self.timestep_selector_box.addWidget(self.timestep_slider)   
-        self.density_toggle = QPushButton("Density")
-        self.density_toggle.setFixedHeight(25)
-        self.density_toggle.clicked.connect(self.toggle_density)
-        self.timestep_selector_box.addWidget(self.density_toggle)
         
         x = np.linspace(0.0, 1.0, 4)
         pos = np.column_stack((x, x))
@@ -313,6 +321,7 @@ class MainWindow(QMainWindow):
         self.settings_ui.addLayout(self.batch_slider_box)
         self.settings_ui.addLayout(self.spp_slider_box)
         self.settings_ui.addWidget(self.view_xy_button)
+        self.settings_ui.addWidget(self.density_toggle)
         self.settings_ui.addLayout(self.transfer_function_box)
         self.settings_ui.addLayout(self.tf_rescale_slider_box)
         self.settings_ui.addLayout(self.timestep_selector_box)
@@ -343,6 +352,13 @@ class MainWindow(QMainWindow):
         self.last_x = None
         self.last_y = None
    
+    def choose_background_color(self):
+        color = QColorDialog.getColor()
+        if color.isValid():
+            self.background_color_button.setStyleSheet(f"background-color: {color.name()};")
+            c = color.getRgbF()
+            self.render_worker.change_background_color.emit(c[0], c[1], c[2])
+            
     def keyPressEvent(self, event):
         if event.key() == Qt.Key_Delete:
             self.tf_editor.deleteLastPoint()
@@ -375,8 +391,8 @@ class MainWindow(QMainWindow):
         self.update_framerate_label.setText(f"Update framerate: {val:0.02f} fps")
     
     def toggle_density(self):
-        if("AMGSRN" in self.render_worker.model.opt['model'] or
-           "APMGSRN" in self.render_worker.model.opt['model']):
+        if("AMGSRN" in self.render_worker.opt['model'] or
+           "APMGSRN" in self.render_worker.opt['model']):
             self.render_worker.toggle_density.emit()
         else:
             self.density_toggle.setChecked(not self.density_toggle.isChecked())
@@ -443,6 +459,7 @@ class MainWindow(QMainWindow):
         else:
             self.render_worker.load_new_data.emit(s)
         self.status_text_update.emit("")
+
         
     def load_tf(self, s):
         print(f"TF changed {s}")
@@ -542,6 +559,7 @@ class RendererThread(QObject):
     load_new_model = pyqtSignal(str)
     load_new_data = pyqtSignal(str)
     change_transfer_function = pyqtSignal(str)
+    change_background_color = pyqtSignal(float, float, float)
     change_batch_size = pyqtSignal(int)
     change_timestep = pyqtSignal(int)
     change_opacity_controlpoints = pyqtSignal(np.ndarray, np.ndarray)
@@ -574,6 +592,7 @@ class RendererThread(QObject):
                            self.batch_size, self.spp, 
                            self.tf, self.device)
         self.do_change_transfer_function("Coolwarm.json")
+        self.do_view_xy()
         self.scene.on_setting_change()
         
         # Set up events
@@ -587,6 +606,7 @@ class RendererThread(QObject):
         self.change_transfer_function.connect(self.do_change_transfer_function)
         self.change_opacity_controlpoints.connect(self.do_change_opacities)
         self.load_new_model.connect(self.do_change_model)
+        self.change_background_color.connect(self.do_change_background_color)
         self.load_new_data.connect(self.do_change_data)
         self.view_xy.connect(self.do_view_xy)
         self.tf_rescale.connect(self.do_tf_rescale)
@@ -630,6 +650,12 @@ class RendererThread(QObject):
         except Exception as e:
             print(f"Exiting render thread.")
             raise e
+
+    def do_change_background_color(self, r, g, b):
+        render_mutex.lock()
+        self.scene.set_background_color(r,g,b)
+        self.scene.on_setting_change()
+        render_mutex.unlock()
 
     def do_resize(self, w, h):
         render_mutex.lock()
@@ -785,6 +811,7 @@ class RendererThread(QObject):
         print(f"Calling on_setting_change")
         self.scene.on_setting_change()
         render_mutex.unlock()
+        self.do_view_xy()
     
     def do_change_timestep(self, t):
         print(f"Setting timestep to {t}")

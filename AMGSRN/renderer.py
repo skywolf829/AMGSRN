@@ -419,6 +419,7 @@ class Scene(torch.nn.Module):
         self.transfer_function = transfer_function
         self.amount_empty = 0.0
         self.camera = camera
+        self.background_color = torch.tensor([1.0, 1.0, 1.0], dtype=torch.float32, device=self.device)
         self.use_density = False
         self.on_setting_change()
     
@@ -475,6 +476,7 @@ class Scene(torch.nn.Module):
         sample_locs -= 1
         if(self.use_density):
             densities = self.model.feature_density(sample_locs.to(self.data_device)).to(self.device)[:,None]
+            densities /= densities.max()
         else:
             densities = self.model(sample_locs.to(self.data_device)).to(self.device)
         rgbs, alphas = self.transfer_function.color_opacity_at_value(densities[:,0])
@@ -500,6 +502,7 @@ class Scene(torch.nn.Module):
             sample_locs -= 1
             if(self.use_density):
                 densities = self.model.feature_density(sample_locs.to(self.data_device)).to(self.device)[:,None]
+                densities /= densities.max()
             else:
                 densities = self.model(sample_locs.to(self.data_device)).to(self.device)
             self.transfer_function.color_opacity_at_value_inplace(densities, rgbs, alphas, ray_ind_start)
@@ -507,12 +510,15 @@ class Scene(torch.nn.Module):
         alphas.log_()
         return rgbs, alphas[:,0]
 
+    def set_background_color(self, r, g, b):
+        self.background_color = torch.tensor([r, g, b], dtype=torch.float32, device=self.device)
+
     def render_rays(self, t_starts, t_ends, ray_indices, n_rays):
         
         colors, _, _, _ = nerfacc.rendering(
             t_starts, t_ends, ray_indices, n_rays, 
             rgb_alpha_fn=self.rgb_alpha_fn,
-            render_bkgd=torch.tensor([1.0, 1.0, 1.0],dtype=torch.float32,device=self.device)
+            render_bkgd=self.background_color
             )
         colors.clip_(0.0, 1.0)
         

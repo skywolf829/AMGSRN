@@ -3,7 +3,8 @@ Improvements over APMGSRN.
 
 
 ## Installation
-Windows: supported via WSL2.
+Windows: supported.
+WSL2: supported.
 Linux: supported.
 MacOS: not supported.
 
@@ -12,7 +13,11 @@ Install CUDA 12.4: https://developer.nvidia.com/cuda-12-4-1-download-archive?tar
 source tools/setup_env.sh
 `
 
-Training is slower on WSL2. Can install in Windows for faster training.
+Optional: install TinyCudaNN for faster training. In your conda environment, run the following:
+`
+pip install "tiny-cuda-nn @ git+https://github.com/NVlabs/tiny-cuda-nn/#subdirectory=bindings/torch"
+`
+On Windows, the above needs to be executed in x64 Native Tools Command Prompt for VS run in administrator mode.
 
 ## Training
 `
