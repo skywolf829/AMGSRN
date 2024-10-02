@@ -20,6 +20,27 @@ def compress_decompress(compressor, input_file, output_file, error_bound, data_s
     elif compressor == 'zfp':
         subprocess.run(['zfp', '-f', '-i', input_file, '-z', f'{output_file}.zfp', '-a', f"{error_bound:.20f}", dims_1, *dims_2], check=True)
         subprocess.run(['zfp', '-f', '-z', f'{output_file}.zfp', '-o', f'{output_file}.zfp.out', '-a', f"{error_bound:.20f}", dims_1, *dims_2], check=True)
+    elif compressor == 'sperr3d':
+        if len(data_shape) == 4:
+            data = np.fromfile(input_file, dtype=np.float32).reshape(data_shape)
+            for i in range(data_shape[0]):
+                slice_file = f'{input_file}_slice_{i}.raw'
+                data[i].tofile(slice_file)
+                slice_output = f'{output_file}_slice_{i}'
+                subprocess.run(['sperr3d', '-c', '--ftype', '32', '--dims', *[str(d) for d in data_shape[1:]], '--pwe', f"{error_bound:.20f}",
+                                '--bitstream', f'{slice_output}.sperr3d', slice_file], check=True)
+                subprocess.run(['sperr3d', '-d', '--decomp_f', f'{slice_output}.sperr3d.out', f'{slice_output}.sperr3d'], check=True)
+                os.remove(slice_file)
+            # Combine decompressed slices
+            decompressed_slices = [np.fromfile(f'{output_file}_slice_{i}.sperr3d.out', dtype=np.float32).reshape(data_shape[1:]) for i in range(data_shape[0])]
+            np.stack(decompressed_slices).tofile(f'{output_file}.sperr3d.out')
+            for i in range(data_shape[0]):
+                os.remove(f'{output_file}_slice_{i}.sperr3d')
+                os.remove(f'{output_file}_slice_{i}.sperr3d.out')
+        else:
+            subprocess.run(['sperr3d', '-c', '--ftype', '32', '--dims', *dims_2, '--pwe', f"{error_bound:.20f}",
+                            '--bitstream', f'{output_file}.sperr3d', input_file], check=True)
+            subprocess.run(['sperr3d', '-d', '--decomp_f', f'{output_file}.sperr3d.out', f'{output_file}.sperr3d'], check=True)
 
 def calculate_psnr(original, compressed):
     mse = np.mean((original - compressed) ** 2)
@@ -89,7 +110,8 @@ def main():
     parser.add_argument('input_path', type=str, help='Path to the dataset file or directory')
     args = parser.parse_args()
 
-    compressors = ['sz3', 'zfp']  # tthresh is slow
+    #compressors = ['sz3', 'zfp', 'sperr3d]  # tthresh is slow
+    compressors = ['sperr3d']  # tthresh is slow
     error_bounds = np.logspace(-3, -0.39794, num=10)  # 10 points from 0.001 to 0.4
 
     all_results = []

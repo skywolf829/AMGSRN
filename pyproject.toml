@@ -19,8 +19,7 @@ dependencies = [
     "h5py==3.11.0",
     "vtk==9.3.1",
     "ninja==1.11.1.1",
-    "onnx==1.16.2",
-    "tensorrt==10.4.0"
+    "pandas==2.2.3"
 ]
 
 [project.optional-dependencies]
