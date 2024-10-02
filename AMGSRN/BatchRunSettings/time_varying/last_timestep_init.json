@@ -1,4 +1,20 @@
-[
+[ 
+    [ "train.py",
+        {        
+            "save_name": "supernova_tv_last_timestep_init",
+            "model": "TVAMGSRN",
+            "data": "supernova",
+            "n_features": 2,
+            "n_grids": 32,
+            "feature_grid_shape": "32,32,32",
+            "n_layers": 2,
+            "nodes_per_layer": 32,
+            "log_every": 0,
+            "log_features_every": 0,
+            "iterations": 30000,
+            "save_grid_diffs": true,
+            "last_timestep_init": true
+    }],
     [ "train.py",
         {        
             "save_name": "supernova_tv_no_last_timestep_init",

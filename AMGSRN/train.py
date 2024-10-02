@@ -446,6 +446,8 @@ if __name__ == '__main__':
         help='Compression level for SZ3, ABS mode only.')
     parser.add_argument('--save_grid_diffs',default=None, type=str2bool,
         help='Save the difference between grids to improve compression.')
+    parser.add_argument('--last_timestep_init',default=None, type=str2bool,
+        help='Initialize the last timestep with the previous timestep.')
 
 
     args = vars(parser.parse_args())

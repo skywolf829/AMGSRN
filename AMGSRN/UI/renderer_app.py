@@ -271,6 +271,10 @@ class MainWindow(QMainWindow):
         self.timestep_slider.valueChanged.connect(self.change_timestep)
         #self.timestep_slider.sliderReleased.connect(self.change_timestep)
         self.timestep_selector_box.addWidget(self.timestep_slider)   
+        self.density_toggle = QPushButton("Density")
+        self.density_toggle.setFixedHeight(25)
+        self.density_toggle.clicked.connect(self.toggle_density)
+        self.timestep_selector_box.addWidget(self.density_toggle)
         
         x = np.linspace(0.0, 1.0, 4)
         pos = np.column_stack((x, x))
@@ -370,6 +374,13 @@ class MainWindow(QMainWindow):
     def update_updates(self, val):
         self.update_framerate_label.setText(f"Update framerate: {val:0.02f} fps")
     
+    def toggle_density(self):
+        if("AMGSRN" in self.render_worker.model.opt['model'] or
+           "APMGSRN" in self.render_worker.model.opt['model']):
+            self.render_worker.toggle_density.emit()
+        else:
+            self.density_toggle.setChecked(not self.density_toggle.isChecked())
+
     def update_frame_time(self, val):
         self.frame_time_label.setText(f"Last frame time: {val:0.02f} sec.")
      
@@ -536,7 +547,8 @@ class RendererThread(QObject):
     change_opacity_controlpoints = pyqtSignal(np.ndarray, np.ndarray)
     view_xy = pyqtSignal()
     tf_rescale = pyqtSignal(float, float)
-    
+    toggle_density = pyqtSignal()
+
     def __init__(self, parent=None):
         super(RendererThread, self).__init__()
         self.parent = parent
@@ -578,6 +590,7 @@ class RendererThread(QObject):
         self.load_new_data.connect(self.do_change_data)
         self.view_xy.connect(self.do_view_xy)
         self.tf_rescale.connect(self.do_tf_rescale)
+        self.toggle_density.connect(self.do_toggle_density)
         self.parent.status_text_update.emit(f"")
         
     def run(self):
@@ -690,6 +703,12 @@ class RendererThread(QObject):
         self.scene.on_tf_change()
         render_mutex.unlock()
     
+    def do_toggle_density(self):
+        render_mutex.lock()
+        self.scene.toggle_density()
+        self.scene.on_setting_change()
+        render_mutex.unlock()
+
     def do_change_batch_size(self, b):
         render_mutex.lock()
         self.batch_size = 2**b

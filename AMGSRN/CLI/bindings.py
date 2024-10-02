@@ -73,7 +73,8 @@ def main():
         max_vram_used_reconstruction = 0
         for timestep in range(opt['n_timesteps']):
             start_time = time.time()
-            output = model_reconstruction_chunked(model, opt, timestep)
+            with torch.no_grad(), torch.autocast(device=opt['device'], dtype=torch.float16):
+                output = model_reconstruction_chunked(model, opt, timestep)
             total_reconstruction_time += time.time() - start_time
             max_vram_used_reconstruction = max(max_vram_used_reconstruction, torch.cuda.max_memory_allocated() / (1024 * 1024))
             create_path(os.path.join(args.output, "Reconstruction"))
@@ -89,7 +90,8 @@ def main():
                 print(f"Max VRAM used during training: {max_vram_used:.2f} MB")
                 # Print reconstruction quality stats
                 for timestep in range(opt['n_timesteps']):
-                    psnr = test_psnr_chunked(model, opt, timestep)
+                    with torch.no_grad(), torch.autocast(device=opt['device'], dtype=torch.float16):
+                        psnr = test_psnr_chunked(model, opt, timestep)
                     if(opt['n_timesteps'] > 1):
                         print(f"PSNR at timestep {timestep}: {psnr:.2f} dB")
                     else:

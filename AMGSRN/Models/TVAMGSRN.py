@@ -29,6 +29,8 @@ class TVAMGSRN(nn.Module):
             persistent=False
         )
 
+        self.last_timestep_init = opt['last_timestep_init']
+
     def min(self):
         return self.volume_min
 
@@ -80,15 +82,14 @@ class TVAMGSRN(nn.Module):
         else:
             with torch.no_grad():
                 # Clone feature grids and transformation parameters
-                self.models[t].feature_grids = nn.Parameter(self.models[t-1].feature_grids.clone().detach())
-                #self.models[t].translations = nn.Parameter(self.models[t-1].translations.clone().detach())
-                #self.models[t]._rotations = nn.Parameter(self.models[t-1]._rotations.clone().detach())
-                #self.models[t]._scales = nn.Parameter(
-                #    self.models[t].inv_scale_activation(0.75 * self.models[t-1].scales.clone().detach())
-                #)
-                
-                # Create an exact copy of the decoder from the previous timestep
-                #self.models[t].decoder.load_state_dict(self.models[t-1].decoder.state_dict())
+                if(self.last_timestep_init): 
+                    self.models[t].feature_grids = nn.Parameter(self.models[t-1].feature_grids.clone().detach())
+                    self.models[t].translations = nn.Parameter(self.models[t-1].translations.clone().detach())
+                    self.models[t]._rotations = nn.Parameter(self.models[t-1]._rotations.clone().detach())
+                    self.models[t]._scales = nn.Parameter(
+                        self.models[t].inv_scale_activation(0.75 * self.models[t-1].scales.clone().detach())
+                    )                
+                    self.models[t].decoder.load_state_dict(self.models[t-1].decoder.state_dict())
 
     def transform(self, x: torch.Tensor, t: int = None) -> torch.Tensor:
         if t is None:

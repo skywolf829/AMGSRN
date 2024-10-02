@@ -64,6 +64,7 @@ class Options():
         opt['save_with_compression']                = True
         opt['save_with_compression_level']          = 0.001
         opt['save_grid_diffs']                      = False
+        opt['last_timestep_init']                   = False
         return opt
 
 def save_options(opt, save_location):

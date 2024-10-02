@@ -419,12 +419,15 @@ class Scene(torch.nn.Module):
         self.transfer_function = transfer_function
         self.amount_empty = 0.0
         self.camera = camera
+        self.use_density = False
         self.on_setting_change()
     
     def get_mem_use(self):
         return torch.cuda.max_memory_allocated(device=self.device) \
                 / (1024**3)
-        
+    def toggle_density(self):
+        self.use_density = not self.use_density
+
     def set_aabb(self, full_shape : np.ndarray):
         if(self.swapxyz):
             self.scene_aabb = \
@@ -470,7 +473,10 @@ class Scene(torch.nn.Module):
         sample_locs /= self.scene_aabb[3:]
         sample_locs *= 2 
         sample_locs -= 1
-        densities = self.model(sample_locs.to(self.data_device)).to(self.device)
+        if(self.use_density):
+            densities = self.model.feature_density(sample_locs.to(self.data_device)).to(self.device)[:,None]
+        else:
+            densities = self.model(sample_locs.to(self.data_device)).to(self.device)
         rgbs, alphas = self.transfer_function.color_opacity_at_value(densities[:,0])
         alphas += 1
         alphas.log_()
@@ -492,26 +498,14 @@ class Scene(torch.nn.Module):
             sample_locs /= (self.scene_aabb[3:]-1)
             sample_locs *= 2
             sample_locs -= 1
-            densities = self.model(sample_locs)
+            if(self.use_density):
+                densities = self.model.feature_density(sample_locs.to(self.data_device)).to(self.device)[:,None]
+            else:
+                densities = self.model(sample_locs.to(self.data_device)).to(self.device)
             self.transfer_function.color_opacity_at_value_inplace(densities, rgbs, alphas, ray_ind_start)
         alphas += 1
         alphas.log_()
         return rgbs, alphas[:,0]
-
-    def forward_maxpoints(self, model, coords):
-        '''
-        Batches forward passes in chunks to reduce memory overhead.
-        '''
-        output_shape = list(coords.shape)
-        output_shape[-1] = 1
-        output = torch.empty(output_shape, 
-            dtype=torch.float32, 
-            device=self.device)
-        with torch.no_grad():
-            for start in range(0, coords.shape[0], self.batch_size):
-                output[start:min(start+self.batch_size, coords.shape[0])] = \
-                    model(coords[start:min(start+self.batch_size, coords.shape[0])].to(self.device))
-        return output
 
     def render_rays(self, t_starts, t_ends, ray_indices, n_rays):
         
@@ -705,7 +699,7 @@ class Scene(torch.nn.Module):
     def one_step_update(self):
         if(self.current_order_spot == len(self.render_order)):
             return
-        with torch.no_grad():
+        with torch.no_grad(), torch.autocast(self.device, enabled=True, dtype=torch.float16):
             x,y = self.render_order[self.current_order_spot]
                         
             mip_stride = min(self.strides, int(2**self.mip_level))
