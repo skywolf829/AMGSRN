@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
-from Models.layers import ReLULayer
-from Other.utility_functions import make_coord_grid
+from AMGSRN.Models.layers import ReLULayer
+from AMGSRN.Other.utility_functions import make_coord_grid
 from typing import List, Optional
 import math
 from AMG_Encoder import create_transformation_matrices, encode, feature_density

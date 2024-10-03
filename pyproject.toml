@@ -1,5 +1,9 @@
 [build-system]
-requires = ["setuptools>=42", "wheel"]
+requires = [
+    "setuptools>=42",
+     "wheel", 
+     "torch==2.4.1+cu124"
+     ]
 build-backend = "setuptools.build_meta"
 
 [project]
@@ -19,7 +23,8 @@ dependencies = [
     "h5py==3.11.0",
     "vtk==9.3.1",
     "ninja==1.11.1.1",
-    "pandas==2.2.3"
+    "pandas==2.2.3",
+    "AMG_Encoder @ git+https://github.com/skywolf829/AMG_Encoder.git"
 ]
 
 [project.optional-dependencies]
@@ -40,3 +45,7 @@ tcnn = [
 extra-index-urls = [
     "https://download.pytorch.org/whl/cu124",
 ]
+
+[project.scripts]
+amgsrn = "AMGSRN.CLI.bindings:compress_decompress"
+amgsrn-render = "AMGSRN.CLI.bindings:renderer"

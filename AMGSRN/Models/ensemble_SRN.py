@@ -1,9 +1,9 @@
 import torch
 import torch.nn as nn
 import os
-from Models.options import load_options
-from Models.models import load_model
-from Other.utility_functions import get_data_size
+from AMGSRN.Models.options import load_options
+from AMGSRN.Models.models import load_model
+from AMGSRN.Other.utility_functions import get_data_size
 
 project_folder_path = os.path.dirname(os.path.abspath(__file__))
 project_folder_path = os.path.join(project_folder_path, "..", "..")

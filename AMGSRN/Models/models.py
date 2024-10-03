@@ -6,8 +6,8 @@ import torch.nn.functional as F
 import os
 from math import pi
 from AMGSRN.Datasets.datasets import Dataset
-from Models.options import *
-from Other.utility_functions import create_folder, make_coord_grid
+from AMGSRN.Models.options import *
+from AMGSRN.Other.utility_functions import create_folder, make_coord_grid
 import math
 import zlib
 import zipfile

@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
-from Models.layers import ReLULayer
-from Models.AMGSRN import AMGSRN, weights_init
+from AMGSRN.Models.layers import ReLULayer
+from AMGSRN.Models.AMGSRN import AMGSRN, weights_init
 from AMG_Encoder import create_transformation_matrices, encode, feature_density
 from typing import List, Optional
 import math

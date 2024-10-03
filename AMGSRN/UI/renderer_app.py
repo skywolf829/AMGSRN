@@ -853,9 +853,11 @@ class RendererThread(QObject):
         self.scene.on_setting_change()
         render_mutex.unlock()
 
-
-if __name__ == '__main__':
+def run_renderer():
     app = QApplication([])
     window = MainWindow()    
     window.show()
     sys.exit(app.exec())
+
+if __name__ == '__main__':
+    run_renderer()

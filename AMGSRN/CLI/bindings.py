@@ -8,9 +8,10 @@ from AMGSRN.test import model_reconstruction_chunked, test_psnr_chunked
 from AMGSRN.Models.models import save_model, load_model
 import torch 
 import time
-from Other.utility_functions import PSNR, tensor_to_cdf, create_path
+from Other.utility_functions import tensor_to_cdf, create_path
+from AMGSRN.UI.renderer_app import run_renderer
 
-def parse_args():
+def parse_compress_decompress_args():
     parser = argparse.ArgumentParser(description="AMGSRN Training and Reconstruction")
     parser.add_argument("-i", "--input", type=str, help="Path to input data file")
     parser.add_argument("-z", "--save", type=str, help="Path to save trained model")
@@ -21,8 +22,8 @@ def parse_args():
     parser.add_argument("-s", "--stats", action="store_true", help="Display statistics")
     return parser.parse_args()
 
-def main():
-    args = parse_args()
+def compress_decompress():
+    args = parse_compress_decompress_args()
     
     torch.manual_seed(42)
     torch.backends.cuda.matmul.allow_tf32 = True
@@ -101,7 +102,7 @@ def main():
             print(f"Reconstruction completed in {total_reconstruction_time:.2f} seconds")
             print(f"Max VRAM used during reconstruction: {max_vram_used_reconstruction:.2f} MB")
 
-if __name__ == "__main__":
-    main()
+def renderer():
+    run_renderer()
 
 
