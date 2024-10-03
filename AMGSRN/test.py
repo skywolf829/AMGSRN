@@ -608,6 +608,10 @@ def half_precision(model, opt):
         print(f"Mean time for half precision model: {sum(times) / len(times) : 0.05f} seconds")
 
 def compression_test(model, opt):
+    font_size = 40
+    marker_size = 10
+    line_width = 5
+
     model = model.to("cuda").eval()
     original_psnr = test_psnr_chunked(model, opt)
     original_size = sum(p.numel() * p.element_size() for p in model.parameters()) / (1024 * 1024)  # Size in MB
@@ -676,13 +680,12 @@ def compression_test(model, opt):
                     print(f"Error in FPZIP compression for {subset_name} with precision {precision}: {str(e)}")
 
     # Plot results
-    fig, axs = plt.subplots(len(param_subsets), 2, figsize=(20, 8*len(param_subsets)))
-    fig.suptitle("Compression Results")
+    fig, ax = plt.subplots(figsize=(12, 8))
 
     # Find global min and max PSNR values
     all_psnrs = [psnr for subsets in results.values() for data in subsets.values() for _, psnr, _ in data]
     all_psnrs.append(original_psnr)
-    min_psnr = 0
+    min_psnr = 20
     max_psnr = min(50, np.max(all_psnrs)*1.1)
 
     # Find global min and max sizes
@@ -691,32 +694,21 @@ def compression_test(model, opt):
     min_size = 0
     max_size = original_size*1.1
 
-    for i, (subset_name, _) in enumerate(param_subsets.items()):
-        ax1 = axs[i, 0] if len(param_subsets) > 1 else axs[0]
-        ax2 = axs[i, 1] if len(param_subsets) > 1 else axs[1]
-        
+    for subset_name, _ in param_subsets.items():
         for compressor, data in results.items():
             if data[subset_name]:
                 sizes, psnrs, bounds = zip(*data[subset_name])
-                ax1.plot(sizes, psnrs, 'o-', label=compressor.upper())
-                ax2.plot(bounds, psnrs, 'o-', label=compressor.upper())
-        
-        ax1.plot(original_size, original_psnr, 'r*', markersize=10, label='Original Model')
-        ax1.set_xlabel("Compressed Size (MB)")
-        ax1.set_ylabel("PSNR (dB)")
-        ax1.set_title(f"{subset_name} Parameters: PSNR vs Compressed Size")
-        ax1.legend()
-        ax1.grid(True)
-        ax1.set_ylim(min_psnr, max_psnr)
-        ax1.set_xlim(min_size, max_size)
-
-        ax2.set_xlabel("Error Bound / Precision")
-        ax2.set_ylabel("PSNR (dB)")
-        ax2.set_title(f"{subset_name} Parameters: PSNR vs Error Bound/Precision")
-        ax2.legend()
-        ax2.grid(True)
-        ax2.set_ylim(min_psnr, max_psnr)
-
+                ax.plot(sizes, psnrs, 'o-', label=f"{compressor.upper()}", markersize=marker_size, linewidth=line_width)
+    
+    ax.plot(original_size, original_psnr, 'r*', markersize=marker_size*3, label='Original Model')
+    ax.set_xlabel("Compressed Size (MB)", fontsize=font_size)
+    ax.set_ylabel("PSNR (dB)", fontsize=font_size)
+    ax.set_title(f"{opt['save_name'].split('_')[0].split('.')[0].rstrip('0123456789').capitalize()}", fontsize=font_size)
+    ax.legend(fontsize=font_size)
+    ax.grid(True)
+    ax.set_ylim(min_psnr, max_psnr)
+    ax.set_xlim(min_size, max_size)
+    ax.tick_params(axis='both', which='major', labelsize=font_size)
     plt.tight_layout()
     plt.savefig(os.path.join(save_folder, opt['save_name'], "compression.png"))
 
@@ -724,12 +716,14 @@ def compression_test(model, opt):
     feature_grids = model.feature_grids.cpu().detach().numpy()
     flattened_grids = feature_grids.flatten()
 
-    plt.figure(figsize=(10, 6))
+    plt.figure(figsize=(12, 8))
     plt.hist(flattened_grids, bins=100, edgecolor='black')
-    plt.title("Histogram of Feature Grid Values")
-    plt.xlabel("Value")
-    plt.ylabel("Frequency")
+    #plt.title("Histogram of Feature Grid Values", fontsize=font_size)
+    plt.xlabel("Value", fontsize=font_size)
+    plt.ylabel("Frequency", fontsize=font_size)
+    plt.tick_params(axis='both', which='major', labelsize=font_size)
     plt.yscale('log')  # Set y-axis to logarithmic scale
+    plt.tight_layout()
     plt.savefig(os.path.join(save_folder, opt['save_name'], "feature_grid_histogram.png"))
     plt.close()
 
@@ -896,6 +890,16 @@ def compress_and_test(model, test_model, opt, error_bound_or_precision, compress
     
     return total_compressed_size / (1024 * 1024), psnr, error_bound_or_precision  # Return size in MB
 
+def comp_report(model, opt):
+    # Compute original model size and PSNR
+    original_size = opt['full_shape'][0] * opt['full_shape'][1] * opt['full_shape'][2] * 4 * opt['n_timesteps']
+    original_psnr = test_psnr_chunked(model, opt)
+    # read the model file's size in bytes
+    model_size = os.path.getsize(os.path.join(save_folder, opt['save_name'], "compressed_model.zip"))
+
+    # Print results in CSV format
+    print("Compressed Size (bytes),Compression Ratio,PSNR")
+    print(f"{model_size},{original_size / model_size:.2f},{original_psnr:.3f}")
 
 def perform_tests(model, tests, opt, timestep):
     if("reconstruction" in tests):
@@ -930,6 +934,8 @@ def perform_tests(model, tests, opt, timestep):
         half_precision(model, opt)
     if("compression" in tests):
         compression_test(model, opt)
+    if("comp_report" in tests):
+        comp_report(model, opt)
 
     if("psnr" in tests):
         return p

@@ -112,6 +112,9 @@ class Dataset(torch.utils.data.Dataset):
         return self.full_coord_grid
     
     def sample_values(self, points, t:int=None):
+        if t is None:
+            t = self.default_timestep
+        self.load_timestep(t)
         x = points[None,None,None,...].to(self.opt['data_device'])
         y = F.grid_sample(self.data[t],
             x, mode='bilinear', 

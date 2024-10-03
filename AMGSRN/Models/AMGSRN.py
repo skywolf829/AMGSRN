@@ -151,7 +151,7 @@ class AMGSRN(nn.Module):
         pass
 
     def unload_timestep(self, timestep:int):
-        self.to('cpu')
+        pass
 
     def get_transform_parameters(self):
         return [{"params": self._rotations},

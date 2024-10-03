@@ -5,6 +5,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 import os
 from math import pi
+from AMGSRN.Datasets.datasets import Dataset
 from Models.options import *
 from Other.utility_functions import create_folder, make_coord_grid
 import math
@@ -116,7 +117,7 @@ def save_model(model,opt):
                 # Create a temporary directory for compressed files
                 temp_dir = os.path.join(path_to_save, "temp_compressed")
                 os.makedirs(temp_dir, exist_ok=True)
-
+                bound = find_optimal_error_bound(m, opt, opt['device'])
                 try:
                     # Attempt to compress feature grids using SZ3
                     feature_grids = state_dict['feature_grids'].cpu().numpy().astype(np.float32)
@@ -128,11 +129,11 @@ def save_model(model,opt):
                         grid_path = os.path.join(temp_dir, f"feature_grid_{j}.raw")
                         grid.tofile(grid_path)
                         
-                        dims = ' '.join(str(d) for d in grid.shape)
+                        dims = ' '.join(str(d) for d in list(grid.shape)[::-1])
                         dim_flag = f"-{len(grid.shape)} {dims}"
                         
                         compressed_path = os.path.join(temp_dir, f"feature_grid_{j}.sz")
-                        command = f"sz3 -f -z {compressed_path} -i {grid_path} -M ABS {opt['save_with_compression_level']} {dim_flag}"
+                        command = f"sz3 -f -z {compressed_path} -i {grid_path} -M ABS {bound:0.20f} {dim_flag}"
                         subprocess.run(command, check=True)
 
                         #decompress and get error to not accumulate error
@@ -156,6 +157,10 @@ def save_model(model,opt):
                     # If compression fails, save everything losslessly
                     for key, tensor in state_dict.items():
                         np.save(os.path.join(temp_dir, f"{key}.npy"), tensor.cpu().numpy())
+                    # Delete any leftover .raw files
+                    for filename in os.listdir(temp_dir):
+                        if filename.endswith('.raw'):
+                            os.remove(os.path.join(temp_dir, filename))
                     opt['compressor_used'] = "none"
 
                 # Create a zip file containing all compressed and losslessly saved arrays
@@ -180,17 +185,19 @@ def save_model(model,opt):
 
             try:
                 # Attempt to compress feature grids using SZ3
+                bound = find_optimal_error_bound(model, opt, opt['device'])
+                print(f"Optimal error bound: {bound}")
                 feature_grids = state_dict['feature_grids'].cpu().numpy().astype(np.float32)
                 for i in range(feature_grids.shape[1]): # iterate over each channel
                     grid = feature_grids[:, i]
                     grid_path = os.path.join(temp_dir, f"feature_grid_{i}.raw")
                     grid.tofile(grid_path)
                     
-                    dims = ' '.join(str(d) for d in grid.shape)
+                    dims = ' '.join(str(d) for d in list(grid.shape)[::-1])
                     dim_flag = f"-{len(grid.shape)} {dims}"
                     
                     compressed_path = os.path.join(temp_dir, f"feature_grid_{i}.sz")
-                    command = f"sz3 -f -z {compressed_path} -i {grid_path} -M ABS {opt['save_with_compression_level']} {dim_flag}"
+                    command = f"sz3 -f -z {compressed_path} -i {grid_path} -M ABS {bound:0.20f} {dim_flag}"
                     subprocess.run(command, check=True)
                     
                     # Remove the raw file
@@ -208,7 +215,12 @@ def save_model(model,opt):
                 # If compression fails, save everything losslessly
                 for key, tensor in state_dict.items():
                     np.save(os.path.join(temp_dir, f"{key}.npy"), tensor.cpu().numpy())
+                # Delete any leftover .raw files
+                for filename in os.listdir(temp_dir):
+                    if filename.endswith('.raw'):
+                        os.remove(os.path.join(temp_dir, filename))
                 opt['compressor_used'] = "none"
+
 
             # Create a zip file containing all compressed and losslessly saved arrays
             with zipfile.ZipFile(os.path.join(path_to_save, "compressed_model.zip"), 'w') as zipf:
@@ -234,6 +246,63 @@ def save_model(model,opt):
         #     with io.StringIO() as json_buffer:
         #         json.dump(opt, json_buffer, sort_keys=True, indent=4)
         #         zipf.writestr('options.json', json_buffer.getvalue())
+
+def find_optimal_error_bound(model, opt, device, max_psnr_drop=0.1, sample_size=2**20):
+    with torch.no_grad():
+
+        def compress_decompress(error_bound):
+            temp_dir = os.path.join(opt['save_name'], 'temp')
+            os.makedirs(temp_dir, exist_ok=True)
+            
+            for i in range(model.feature_grids.shape[1]):
+                grid_np = model.feature_grids[:,i].detach().cpu().numpy()
+                grid_path = os.path.join(temp_dir, f"grid_{i}.raw")
+                grid_np.tofile(grid_path)
+                
+                dims = ' '.join(str(d) for d in grid_np.shape)
+                dim_flag = f"-{len(grid_np.shape)} {dims}"
+                
+                compressed_path = os.path.join(temp_dir, f"grid_{i}.sz")
+                decompressed_path = os.path.join(temp_dir, f"grid_{i}_decompressed.raw")
+                
+                compress_cmd = f"sz3 -f -z {compressed_path} -i {grid_path} -M ABS {error_bound} {dim_flag}"
+                decompress_cmd = f"sz3 -f -z {compressed_path} -o {decompressed_path} {dim_flag}"
+                
+                subprocess.run(compress_cmd, check=True, shell=True)
+                subprocess.run(decompress_cmd, check=True, shell=True)
+                
+                decompressed_grid = np.fromfile(decompressed_path, dtype=np.float32).reshape(grid_np.shape)
+                model.feature_grids[:,i] = torch.from_numpy(decompressed_grid).to(device)
+            
+            for file in os.listdir(temp_dir):
+                os.remove(os.path.join(temp_dir, file))
+            os.rmdir(temp_dir)
+
+        def evaluate_psnr(x, y):
+            output = model(x)
+            return -10 * torch.log10(torch.mean((output - y) ** 2)).item()
+
+        error_bounds = np.logspace(-4, -1, 40)[::-1].tolist() # 0.1 to 0.0001
+        d = Dataset(opt)
+        d.load_timestep(model.get_default_timestep())
+        d.set_default_timestep(model.get_default_timestep())
+        x, y = d.get_random_points(sample_size)
+        initial_psnr = evaluate_psnr(x, y)
+
+        original_grids =  model.feature_grids.clone()
+        best_error_bound = error_bounds[-1]
+        for error_bound in error_bounds:
+            compress_decompress(error_bound)
+            psnr = evaluate_psnr(x, y)
+
+            # Restore original grids
+            model.feature_grids[:] = original_grids.clone()[:]
+            print(f"{error_bound:0.20f} {psnr:0.20f} {initial_psnr - psnr:0.20f}")
+            if initial_psnr - psnr < max_psnr_drop:
+                best_error_bound = error_bound
+                break
+
+    return best_error_bound
 
 def load_model(opt, device):
     path_to_load = os.path.join(save_folder, opt["save_name"])

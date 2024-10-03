@@ -10,7 +10,7 @@ from glob import glob
 
 def compress_decompress(compressor, input_file, output_file, error_bound, data_shape):
     dims_1 = f'-{len(data_shape)}'
-    dims_2 = [str(i) for i in data_shape]
+    dims_2 = [str(i) for i in data_shape][::-1]
     if compressor == 'sz3':
         subprocess.run(['sz3', '-f', '-i', input_file, '-o', f'{output_file}.sz3.out', '-z', f'{output_file}.sz3',
                          '-M', 'ABS', '-A', f"{error_bound:.20f}", dims_1, *dims_2], check=True)
@@ -86,7 +86,7 @@ def process_file(file_path, compressors, error_bounds):
     raw_file = f"{file_path}.raw"
     data.tofile(raw_file)
     
-    pool = multiprocessing.Pool(4)
+    pool = multiprocessing.Pool(8)
     
     tasks = [(file_path, compressor, error_bound, data, data_shape, raw_file) 
              for compressor in compressors for error_bound in error_bounds]
@@ -110,8 +110,7 @@ def main():
     parser.add_argument('input_path', type=str, help='Path to the dataset file or directory')
     args = parser.parse_args()
 
-    #compressors = ['sz3', 'zfp', 'sperr3d]  # tthresh is slow
-    compressors = ['sperr3d']  # tthresh is slow
+    compressors = ['sz3', 'zfp', 'sperr3d']  # tthresh is slow
     error_bounds = np.logspace(-3, -0.39794, num=10)  # 10 points from 0.001 to 0.4
 
     all_results = []

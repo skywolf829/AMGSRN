@@ -327,7 +327,6 @@ def train(model, dataset, opt):
         dataset.load_timestep(t)
         train_model(model, dataset, opt)
         dataset.unload_timestep(t)
-        model.unload_timestep(t)
         
         opt['iteration_number'] = 0
         # Create histogram of transform parameters
@@ -496,6 +495,7 @@ if __name__ == '__main__':
     start_time = time.time()
     
     train(model, dataset, opt)
+    del dataset
     save_model(model, opt)
     
 
