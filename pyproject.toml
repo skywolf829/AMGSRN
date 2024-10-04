@@ -35,7 +35,8 @@ dependencies = [
     "PyQt5==5.15.11",
     "superqt==0.6.7",
     "pyqtgraph==0.13.7",
-    "nerfacc @ git+https://github.com/nerfstudio-project/nerfacc.git"
+    #"nerfacc @ git+https://github.com/nerfstudio-project/nerfacc.git"
+    "nerfacc @ git+https://github.com/skywolf829/nerfacc.git@pip_installable"
 ]
 
 [tool.pip]
