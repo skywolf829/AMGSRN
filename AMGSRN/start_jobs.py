@@ -5,8 +5,8 @@ import json
 import time
 import subprocess
 import shlex
-from Other.utility_functions import create_path, get_data_size
-from Models.options import Options, save_options
+from AMGSRN.Other.utility_functions import create_path, get_data_size
+from AMGSRN.Models.options import Options, save_options
 
 project_folder_path = os.path.dirname(os.path.abspath(__file__))
 project_folder_path = os.path.join(project_folder_path, "..")

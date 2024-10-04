@@ -8,7 +8,7 @@ from AMGSRN.test import model_reconstruction_chunked, test_psnr_chunked
 from AMGSRN.Models.models import save_model, load_model
 import torch 
 import time
-from Other.utility_functions import tensor_to_cdf, create_path
+from AMGSRN.Other.utility_functions import tensor_to_cdf, create_path
 from AMGSRN.UI.renderer_app import run_renderer
 
 def parse_compress_decompress_args():

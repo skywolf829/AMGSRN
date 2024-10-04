@@ -1,10 +1,10 @@
 from __future__ import absolute_import, division, print_function
 import argparse
 import os
-from Other.utility_functions import PSNR, tensor_to_cdf, create_path, make_coord_grid
-from Models.models import load_model, sample_grid, forward_maxpoints, save_model
-from Models.options import load_options
-from Datasets.datasets import Dataset
+from AMGSRN.Other.utility_functions import PSNR, tensor_to_cdf, create_path, make_coord_grid
+from AMGSRN.Models.models import load_model, sample_grid, forward_maxpoints, save_model
+from AMGSRN.Models.options import load_options
+from AMGSRN.Datasets.datasets import Dataset
 import torch
 import numpy as np
 import torch.nn.functional as F

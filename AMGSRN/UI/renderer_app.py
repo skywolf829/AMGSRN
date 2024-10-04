@@ -5,7 +5,7 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 import argparse
 import time
 import numpy as np
-from Other.utility_functions import str2bool
+from AMGSRN.Other.utility_functions import str2bool
 from PyQt5.QtCore import QSize, Qt, QTimer, QMutex
 from PyQt5.QtGui import QImage, QPixmap, QPalette, QColor, QIcon
 from PyQt5.QtWidgets import QApplication, QMainWindow, QPushButton, \

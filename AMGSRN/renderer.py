@@ -2,10 +2,10 @@ import torch
 import nerfacc
 import argparse
 import os
-from Models.models import load_model
-from Models.options import load_options
+from AMGSRN.Models.models import load_model
+from AMGSRN.Models.options import load_options
 import numpy as np
-from Other.utility_functions import make_coord_grid, str2bool
+from AMGSRN.Other.utility_functions import make_coord_grid, str2bool
 import time
 import torch.nn.functional as F
 from typing import List, Tuple

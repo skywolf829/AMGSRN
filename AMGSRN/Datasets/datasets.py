@@ -1,8 +1,7 @@
 import os
 import torch
-from Other.utility_functions import make_coord_grid, nc_to_tensor, curl
+from AMGSRN.Other.utility_functions import make_coord_grid, nc_to_tensor
 import torch.nn.functional as F
-import time
 
 project_folder_path = os.path.dirname(os.path.abspath(__file__))
 project_folder_path = os.path.join(project_folder_path, "..", "..")

@@ -1,25 +1,24 @@
 from __future__ import absolute_import, division, print_function
 import argparse
-from Datasets.datasets import Dataset
+from AMGSRN.Datasets.datasets import Dataset
 import datetime
-from Other.utility_functions import str2bool
-from Models.models import load_model, create_model, save_model
+from AMGSRN.Other.utility_functions import str2bool
+from AMGSRN.Models.models import load_model, create_model, save_model
 import torch
 import torch.optim as optim
 import time
 import os
-from Models.options import *
+from AMGSRN.Models.options import *
 from torch.utils.tensorboard import SummaryWriter
-from Models.losses import *
+from AMGSRN.Models.losses import *
 import shutil
-from Other.utility_functions import make_coord_grid, create_path
-from Other.vis_io import get_vts, write_pvd, write_vtm
+from AMGSRN.Other.utility_functions import make_coord_grid, create_path
+from AMGSRN.Other.vis_io import get_vts, write_pvd, write_vtm
 from vtk import vtkMultiBlockDataSet
 import numpy as np
 from torch.utils.data import DataLoader
 import glob
 import matplotlib.pyplot as plt
-import vtk
 import torch.profiler
 from torch.profiler import profile, record_function, ProfilerActivity
 

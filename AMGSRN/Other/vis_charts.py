@@ -7,7 +7,7 @@ import matplotlib.pyplot as plt
 import argparse
 import os
 from math import log2
-from Other.utility_functions import create_path
+from AMGSRN.Other.utility_functions import create_path
 
 #plt.style.use('Solarize_Light2')
 #plt.style.use('fivethirtyeight')

@@ -15,6 +15,7 @@ authors = [
 ]
 requires-python = ">=3.11"
 dependencies = [
+    # Training/testing dependencies
     "numpy==1.26.4",
     "torch==2.4.1+cu124", 
     "torchvision==0.19.1+cu124",
@@ -24,11 +25,10 @@ dependencies = [
     "vtk==9.3.1",
     "ninja==1.11.1.1",
     "pandas==2.2.3",
-    "AMG_Encoder @ git+https://github.com/skywolf829/AMG_Encoder.git"
-]
+    "AMG_Encoder @ git+https://github.com/skywolf829/AMG_Encoder.git",
 
-[project.optional-dependencies]
-renderer = [
+
+    # Renderer depenencies
     "imageio==2.35.1",
     "opencv-python==4.10.0.84",
     "pyquaternion==0.9.9",
@@ -36,9 +36,6 @@ renderer = [
     "superqt==0.6.7",
     "pyqtgraph==0.13.7",
     "nerfacc @ git+https://github.com/nerfstudio-project/nerfacc.git"
-]
-tcnn = [
-    #"git+https://github.com/NVlabs/tiny-cuda-nn/#subdirectory=bindings/torch",
 ]
 
 [tool.pip]

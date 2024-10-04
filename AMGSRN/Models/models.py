@@ -117,7 +117,7 @@ def save_model(model,opt):
                 # Create a temporary directory for compressed files
                 temp_dir = os.path.join(path_to_save, "temp_compressed")
                 os.makedirs(temp_dir, exist_ok=True)
-                bound = find_optimal_error_bound(m, opt, opt['device'])
+                bound = find_optimal_error_bound(m, opt, opt['device'], timestep=i)
                 try:
                     # Attempt to compress feature grids using SZ3
                     feature_grids = state_dict['feature_grids'].cpu().numpy().astype(np.float32)
@@ -208,6 +208,7 @@ def save_model(model,opt):
                     if key != 'feature_grids':
                         np.save(os.path.join(temp_dir, f"{key}.npy"), tensor.cpu().numpy())
                 opt['compressor_used'] = "sz3"
+                opt['save_with_compression_level'] = bound
 
             except Exception as e:
                 traceback.print_exc()
@@ -247,7 +248,7 @@ def save_model(model,opt):
         #         json.dump(opt, json_buffer, sort_keys=True, indent=4)
         #         zipf.writestr('options.json', json_buffer.getvalue())
 
-def find_optimal_error_bound(model, opt, device, max_psnr_drop=0.1, sample_size=2**20):
+def find_optimal_error_bound(model, opt, device, max_psnr_drop=0.1, sample_size=2**20, timestep=0):
     with torch.no_grad():
 
         def compress_decompress(error_bound):
@@ -284,8 +285,8 @@ def find_optimal_error_bound(model, opt, device, max_psnr_drop=0.1, sample_size=
 
         error_bounds = np.logspace(-4, -1, 40)[::-1].tolist() # 0.1 to 0.0001
         d = Dataset(opt)
-        d.load_timestep(model.get_default_timestep())
-        d.set_default_timestep(model.get_default_timestep())
+        d.load_timestep(timestep)
+        d.set_default_timestep(timestep)
         x, y = d.get_random_points(sample_size)
         initial_psnr = evaluate_psnr(x, y)
 

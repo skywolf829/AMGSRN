@@ -5,7 +5,7 @@ import json
 import time
 import subprocess
 import shlex
-from Other.utility_functions import create_path, nc_to_tensor, tensor_to_cdf, make_coord_grid, npy_to_cdf
+from AMGSRN.Other.utility_functions import create_path, nc_to_tensor, tensor_to_cdf, make_coord_grid, npy_to_cdf
 import h5py
 import numpy as np
 
