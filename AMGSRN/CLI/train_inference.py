@@ -9,7 +9,6 @@ from AMGSRN.Models.models import save_model, load_model
 import torch 
 import time
 from AMGSRN.Other.utility_functions import tensor_to_cdf, create_path
-from AMGSRN.UI.renderer_app import run_renderer
 
 def parse_compress_decompress_args():
     parser = argparse.ArgumentParser(description="AMGSRN Training and Reconstruction")
@@ -101,8 +100,5 @@ def compress_decompress():
             # Print reconstruction stats
             print(f"Reconstruction completed in {total_reconstruction_time:.2f} seconds")
             print(f"Max VRAM used during reconstruction: {max_vram_used_reconstruction:.2f} MB")
-
-def renderer():
-    run_renderer()
 
 

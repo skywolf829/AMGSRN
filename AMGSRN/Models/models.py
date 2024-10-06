@@ -1,24 +1,19 @@
 from __future__ import absolute_import, division, print_function
 import torch
 import torch.autograd
-import torch.nn as nn
-import torch.nn.functional as F
 import os
-from math import pi
 from AMGSRN.Datasets.datasets import Dataset
 from AMGSRN.Models.options import *
 from AMGSRN.Other.utility_functions import create_folder, make_coord_grid
 import math
-import zlib
 import zipfile
-import base64
 import io
 import numpy as np
 import subprocess
 import platform
 import os
 import traceback
-
+import tempfile
 project_folder_path = os.path.dirname(os.path.abspath(__file__))
 project_folder_path = os.path.join(project_folder_path, "..", "..")
 data_folder = os.path.join(project_folder_path, "Data")
@@ -252,32 +247,26 @@ def find_optimal_error_bound(model, opt, device, max_psnr_drop=0.1, sample_size=
     with torch.no_grad():
 
         def compress_decompress(error_bound):
-            temp_dir = os.path.join(opt['save_name'], 'temp')
-            os.makedirs(temp_dir, exist_ok=True)
-            
-            for i in range(model.feature_grids.shape[1]):
-                grid_np = model.feature_grids[:,i].detach().cpu().numpy()
-                grid_path = os.path.join(temp_dir, f"grid_{i}.raw")
-                grid_np.tofile(grid_path)
-                
-                dims = ' '.join(str(d) for d in grid_np.shape)
-                dim_flag = f"-{len(grid_np.shape)} {dims}"
-                
-                compressed_path = os.path.join(temp_dir, f"grid_{i}.sz")
-                decompressed_path = os.path.join(temp_dir, f"grid_{i}_decompressed.raw")
-                
-                compress_cmd = f"sz3 -f -z {compressed_path} -i {grid_path} -M ABS {error_bound} {dim_flag}"
-                decompress_cmd = f"sz3 -f -z {compressed_path} -o {decompressed_path} {dim_flag}"
-                
-                subprocess.run(compress_cmd, check=True, shell=True)
-                subprocess.run(decompress_cmd, check=True, shell=True)
-                
-                decompressed_grid = np.fromfile(decompressed_path, dtype=np.float32).reshape(grid_np.shape)
-                model.feature_grids[:,i] = torch.from_numpy(decompressed_grid).to(device)
-            
-            for file in os.listdir(temp_dir):
-                os.remove(os.path.join(temp_dir, file))
-            os.rmdir(temp_dir)
+            with tempfile.TemporaryDirectory() as temp_dir:
+                for i in range(model.feature_grids.shape[1]):
+                    grid_np = model.feature_grids[:,i].detach().cpu().numpy()
+                    grid_path = os.path.join(temp_dir, f"grid_{i}.raw")
+                    grid_np.tofile(grid_path)
+                    
+                    dims = ' '.join(str(d) for d in grid_np.shape)
+                    dim_flag = f"-{len(grid_np.shape)} {dims}"
+                    
+                    compressed_path = os.path.join(temp_dir, f"grid_{i}.sz")
+                    decompressed_path = os.path.join(temp_dir, f"grid_{i}_decompressed.raw")
+                    
+                    compress_cmd = f"sz3 -f -z {compressed_path} -i {grid_path} -M ABS {error_bound} {dim_flag}"
+                    decompress_cmd = f"sz3 -f -z {compressed_path} -o {decompressed_path} {dim_flag}"
+                    
+                    subprocess.run(compress_cmd, check=True, shell=True)
+                    subprocess.run(decompress_cmd, check=True, shell=True)
+                    
+                    decompressed_grid = np.fromfile(decompressed_path, dtype=np.float32).reshape(grid_np.shape)
+                    model.feature_grids[:,i] = torch.from_numpy(decompressed_grid).to(device)
 
         def evaluate_psnr(x, y):
             output = model(x)
@@ -305,8 +294,9 @@ def find_optimal_error_bound(model, opt, device, max_psnr_drop=0.1, sample_size=
 
     return best_error_bound
 
-def load_model(opt, device):
-    path_to_load = os.path.join(save_folder, opt["save_name"])
+def load_model(opt, device, path_to_load = None):
+    if path_to_load is None:
+        path_to_load = os.path.join(save_folder, opt["save_name"])
     
     try:
         import tinycudann

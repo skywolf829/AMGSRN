@@ -45,7 +45,7 @@ class RawData(torch.nn.Module):
         project_folder_path = os.path.join(project_folder_path, "..")
         data_folder = os.path.join(project_folder_path, "Data")
         from Other.utility_functions import nc_to_tensor
-        self.data, self.shape = nc_to_tensor(os.path.join(data_folder, data_name))
+        self.data, self.shape = nc_to_tensor(data_name)
         self.data = self.data.to(device)
     
     def set_default_timestep(self, timestep:int):
@@ -423,9 +423,13 @@ class Scene(torch.nn.Module):
         self.use_density = False
         self.on_setting_change()
     
+    def set_model(self, model):
+        self.model = model
+    
     def get_mem_use(self):
         return torch.cuda.max_memory_allocated(device=self.device) \
                 / (1024**3)
+    
     def toggle_density(self):
         self.use_density = not self.use_density
 
@@ -526,6 +530,8 @@ class Scene(torch.nn.Module):
         return colors
       
     def render(self, camera):
+        if self.model is None:
+            return torch.zeros([self.image_resolution[0], self.image_resolution[1], 3], device=self.device) + self.background_color[None,None,:]
         with torch.no_grad():
             ray_indices, t_starts, t_ends = self.generate_viewpoint_rays(camera)
             colors = self.render_rays(t_starts, t_ends, ray_indices, self.image_resolution[0]*self.image_resolution[1])
@@ -703,7 +709,7 @@ class Scene(torch.nn.Module):
         torch.cuda.empty_cache()
     
     def one_step_update(self):
-        if(self.current_order_spot == len(self.render_order)):
+        if(self.current_order_spot == len(self.render_order) or self.model is None):
             return
         with torch.no_grad(), torch.autocast(self.device, enabled=True, dtype=torch.float16):
             x,y = self.render_order[self.current_order_spot]

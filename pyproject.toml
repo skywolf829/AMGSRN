@@ -35,8 +35,7 @@ dependencies = [
     "PyQt5==5.15.11",
     "superqt==0.6.7",
     "pyqtgraph==0.13.7",
-    #"nerfacc @ git+https://github.com/nerfstudio-project/nerfacc.git"
-    "nerfacc @ git+https://github.com/skywolf829/nerfacc.git@pip_installable"
+    "nerfacc @ git+https://github.com/nerfstudio-project/nerfacc.git"
 ]
 
 [tool.pip]
@@ -45,5 +44,7 @@ extra-index-urls = [
 ]
 
 [project.scripts]
-amgsrn = "AMGSRN.CLI.bindings:compress_decompress"
-amgsrn-render = "AMGSRN.CLI.bindings:renderer"
+amgsrn = "AMGSRN.CLI.train_inference:compress_decompress"
+amgsrn-render = "AMGSRN.CLI.run_renderer:renderer"
+amgsrn-renderer = "AMGSRN.CLI.run_renderer:renderer"
+amgsrn-batch-run = "AMGSRN.CLI.batch_run:batch_run"

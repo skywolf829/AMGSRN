@@ -161,9 +161,9 @@ def parse_devices(devices_text):
             devices[i] = str(devices[i])
     return devices
 
-if __name__ == '__main__':
+def main():
     parser = argparse.ArgumentParser(description='Trains models given settings on available gpus')
-    parser.add_argument('--settings',default=None,type=str,
+    parser.add_argument('settings', type=str,
         help='The settings file with options for each model to train')
     parser.add_argument('--devices',default="all",type=str,
         help='Which [cuda] devices(s) to train on, separated with commas. Default: all, which uses all available CUDA devices')
@@ -228,3 +228,6 @@ if __name__ == '__main__':
 
     print("All jobs have completed.")
     quit()
+
+if __name__ == '__main__':
+    main()

@@ -194,18 +194,14 @@ class MainWindow(QMainWindow):
         # Settings area
         self.settings_ui = QVBoxLayout()       
          
-        self.load_box = QHBoxLayout()  
-        self.load_box.addWidget(QLabel("Load from: "))
-        self.load_from_dropdown = QComboBox()        
-        self.load_from_dropdown.addItems(["Model", "Data"])   
-        self.load_from_dropdown.currentTextChanged.connect(self.data_box_update) 
-        self.load_box.addWidget(self.load_from_dropdown)
-           
-        self.datamodel_box = QHBoxLayout()  
-        self.datamodel_box.addWidget(QLabel("Model/data: "))
-        self.models_dropdown = self.load_models_dropdown()
-        self.models_dropdown.currentTextChanged.connect(self.load_model)
-        self.datamodel_box.addWidget(self.models_dropdown)
+        self.load_box = QHBoxLayout()
+        self.load_box.addWidget(QLabel("Load file or folder:"))
+        self.load_button = QPushButton("Browse")
+        self.load_button.clicked.connect(self.open_file_dialog)
+        self.load_box.addWidget(self.load_button)
+
+        self.file_path_label = QLabel("No file selected")
+        self.load_box.addWidget(self.file_path_label)
         
         self.tf_box = QHBoxLayout()  
         self.tf_box.addWidget(QLabel("Colormap:"))
@@ -316,7 +312,6 @@ class MainWindow(QMainWindow):
         self.save_img_button.clicked.connect(self.save_img)
         
         self.settings_ui.addLayout(self.load_box)
-        self.settings_ui.addLayout(self.datamodel_box)
         self.settings_ui.addLayout(self.tf_box)
         self.settings_ui.addLayout(self.batch_slider_box)
         self.settings_ui.addLayout(self.spp_slider_box)
@@ -352,6 +347,36 @@ class MainWindow(QMainWindow):
         self.last_x = None
         self.last_y = None
    
+
+    def open_file_dialog(self):
+        file_dialog = QFileDialog()
+        file_dialog.setFileMode(QFileDialog.Directory)
+        file_dialog.setOption(QFileDialog.DontUseNativeDialog, True)
+        file_dialog.setOption(QFileDialog.ShowDirsOnly, False)
+        if file_dialog.exec_():
+            selected_files = file_dialog.selectedUrls()
+            if selected_files:
+                file_path = selected_files[0].toLocalFile()
+                print(file_path)
+                self.file_path_label.setText(file_path)
+                self.load_file_or_folder(file_path)
+
+    def load_file_or_folder(self, path):
+        if os.path.isfile(path):
+            self.load_file(path)
+        elif os.path.isdir(path):
+            self.load_folder(path)
+        else:
+            print("Invalid path selected")
+
+    def load_file(self, file_path):
+        # Implement file loading logic here
+        pass
+
+    def load_folder(self, folder_path):
+        self.load_model(folder_path)
+        pass 
+
     def choose_background_color(self):
         color = QColorDialog.getColor()
         if color.isValid():
@@ -408,11 +433,6 @@ class MainWindow(QMainWindow):
         else:            
             self.models_dropdown.clear()
             self.models_dropdown.addItems(self.available_data)
-       
-    def load_models_dropdown(self):
-        dropdown = QComboBox()        
-        dropdown.addItems(self.available_models)        
-        return dropdown
 
     def load_colormaps_dropdown(self):
         dropdown = QComboBox()        
@@ -584,7 +604,7 @@ class RendererThread(QObject):
         self.frame_rate = []
         self.tf = TransferFunction(self.device)      
         
-        self.initialize_model()  
+        #self.initialize_model()  
         self.parent.status_text_update.emit("Initializing scene...") 
         self.initialize_camera()        
         self.scene = Scene(self.model, self.camera, 
@@ -618,6 +638,9 @@ class RendererThread(QObject):
         current_spot = 0
         try:
             while True:
+                if self.model is None:
+                    time.sleep(0.1)
+                    continue
                 current_spot = self.scene.current_order_spot
                 render_mutex.lock()
                 if(self.scene.current_order_spot == 0):
@@ -787,9 +810,10 @@ class RendererThread(QObject):
         self.parent.set_timestep(0)
 
         render_mutex.lock()
-        print(f"Loading model {s}")
-        self.opt = load_options(os.path.abspath(os.path.join('SavedModels', s)))
-        self.model = load_model(self.opt, self.device).to(self.device)
+        p = os.path.abspath(s)
+        print(f"Loading model from {p}")
+        self.opt = load_options(p)
+        self.model = load_model(self.opt, self.device, p).to(self.device)
         print(f"Model loaded")
         self.model.eval()
         print(f"Getting extents")
@@ -814,6 +838,8 @@ class RendererThread(QObject):
         self.do_view_xy()
     
     def do_change_timestep(self, t):
+        if self.model is None:
+            return
         print(f"Setting timestep to {t}")
         render_mutex.lock()
         self.model.set_default_timestep(t)
@@ -822,8 +848,9 @@ class RendererThread(QObject):
     
     def do_change_data(self, s):
         render_mutex.lock()
-        print(f"Loading model {s}")
-        self.model = RawData(s, self.device)
+        p = os.path.abspath(s)
+        print(f"Loading data from {p}")
+        self.model = RawData(p, self.device)
         different_size = (self.full_shape[0] != self.model.shape[0] or
                           self.full_shape[1] != self.model.shape[1] or
                           self.full_shape[2] != self.model.shape[2])
