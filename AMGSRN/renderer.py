@@ -823,7 +823,7 @@ if __name__ == '__main__':
         type=int,
         help="batch size for feedforward. Larger batch size renders faster. Use smaller values for smaller VRAM. Typically between 2^19 - 2^25."
     )
-
+    
     parser.add_argument(
         '--img_name',
         default="render.png",
@@ -849,15 +849,14 @@ if __name__ == '__main__':
         opt['device'] = args['data_device']
         opt['data_device'] = args['data_device']
         model = load_model(opt, args['data_device'])
-        print(opt['data_device'])
         model = model.to(opt['data_device'])
         model.set_default_timestep(args['timestep'])
         full_shape = opt['full_shape']
         model.eval()
     else:
         model = RawData(args['load_from'], args['data_device'])
-        full_shape = model.shape
-    
+        full_shape = list(model.shape)
+    print(f"Min max of model: {model.min()}, {model.max()}")
     batch_size = args['batch_size']
             
     if("cuda" in args['device'] or "cuda" in args['data_device']):        
@@ -877,7 +876,7 @@ if __name__ == '__main__':
     camera = Camera(
         device,
         scene_aabb=aabb,
-        coi=aabb.reshape(2,3).mean(dim=0), # camera lookat center of aabb,
+        coi=aabb.reshape(2,3).mean(dim=0).flip(0), # camera lookat center of aabb,
         azi_deg=args['azi'],
         polar_deg=args['polar'],
         dist=args['dist']
@@ -886,6 +885,7 @@ if __name__ == '__main__':
     scene = Scene(model, camera, full_shape, args['hw'], 
                   batch_size, args['spp'], tf, device, 
                   args['data_device'])
+    
     if args['dist'] is None:
         # set default camera distance to COI by a ratio to AABB
         args['dist'] = (scene.scene_aabb.max(0)[0] - scene.scene_aabb.min(0)[0])*1.8
@@ -899,7 +899,7 @@ if __name__ == '__main__':
     
     # One warm up is always slower    
     img, seq = scene.render_checkerboard()
-
+    
     from imageio import imsave
     imsave(os.path.join(output_folder, args['img_name']), 
            (img*255).cpu().numpy().astype(np.uint8))
@@ -926,7 +926,7 @@ if __name__ == '__main__':
         
     imgs_to_video_imageio(os.path.join(output_folder, "Render_sequence_mask_blend.mp4"), 
                           np.array(seq), fps=15)
-
+    '''
     from imageio import imsave, imread
     from Other.utility_functions import PSNR, ssim
     
@@ -936,10 +936,7 @@ if __name__ == '__main__':
     s = ssim(img.permute(2,0,1).unsqueeze(0), gt_im.permute(2,0,1).unsqueeze(0))
     print(f"PSNR (image): {p:0.03f} dB")
     print(f"SSIM (image): {s: 0.03f} ")
-    #img = img.astype(np.uint8)
     
-    imsave("Output/model.png", img.cpu().numpy())
-    '''
     
     
     timesteps = 10

@@ -20,7 +20,6 @@ class fVSRN_NGP(nn.Module):
         res_grid = [eval(i) for i in opt['feature_grid_shape'].split(',')]
         for i in range(len(res_grid)):
             res *= res_grid[i]
-
         import tinycudann as tcnn
         self.model = tcnn.NetworkWithInputEncoding(
             n_input_dims=opt['n_dims']*2,
@@ -35,7 +34,8 @@ class fVSRN_NGP(nn.Module):
                         "n_features_per_level": int(opt['n_features']),
                         "base_resolution": int(res**(1.0/len(res_grid)))+1,
                         "interpolation": "Linear",
-                        "n_dims_to_encode": opt['n_dims']
+                        "n_dims_to_encode": opt['n_dims'],
+                        "per_level_scale": 1
                     },
                     {
                         "n_frequencies": int(opt['num_positional_encoding_terms']), 
@@ -52,6 +52,7 @@ class fVSRN_NGP(nn.Module):
                 "n_hidden_layers": opt['n_layers'],
             },
         )
+        print(self.model)
         
         self.register_buffer(
             "volume_min",
@@ -74,7 +75,7 @@ class fVSRN_NGP(nn.Module):
         pass
 
     def unload_timestep(self, timestep:int):
-        self.to('cpu')
+        pass
 
 
     def min(self):

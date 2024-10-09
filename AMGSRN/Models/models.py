@@ -450,6 +450,9 @@ def create_model(opt):
              or opt['model'] == "APMGSRN_cuda" or opt['model'] == "AMGSRN_cuda"):
             from Models.AMGSRN import AMGSRN
             return AMGSRN(opt)
+        elif(opt['model'] == "AMGSRN_mutidecoder"):
+            from Models.AMGSRN_mutidecoder import AMGSRN_mutidecoder
+            return AMGSRN_mutidecoder(opt)
         elif(opt['model'] == "APMGSRN_pytorch" or \
              opt['model'] == "AMGSRN_pytorch" or \
              opt['model'] == "AMGSRN_old" or \

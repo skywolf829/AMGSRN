@@ -1,0 +1,7 @@
+[    
+    [ "test.py",
+        {        
+        "load_from": "chameleon_manygrids",
+        "tests": "psnr"
+    }]
+]

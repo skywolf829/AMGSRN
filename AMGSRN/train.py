@@ -174,6 +174,7 @@ def train_step_APMGSRN(opt, iteration, batch, dataset, model, optimizer, schedul
                     torch.log(density+1e-16), 
                     torch.log(target.detach()+1e-16), reduction='none', 
                     log_target=True)
+                # density_loss = F.mse_loss(density, target.detach())
 
 
         with record_function("density_loss backward"):
@@ -209,8 +210,7 @@ def train_step_APMGSRN(opt, iteration, batch, dataset, model, optimizer, schedul
         prof.export_chrome_trace(os.path.join(output_folder, opt['save_name']+"_trace.json"))
         print(f'Saved profile trace to {os.path.join(output_folder, opt["save_name"],"_trace.json")}')
 
-def train_step_vanilla(opt, iteration, batch, dataset, model, optimizer, scheduler, writer, scaler,
-                       early_stopping_data=None):
+def train_step_vanilla(opt, iteration, batch, dataset, model, optimizer, scheduler, writer, scaler):
     opt['iteration_number'] = iteration
     optimizer.zero_grad()
        
@@ -218,7 +218,7 @@ def train_step_vanilla(opt, iteration, batch, dataset, model, optimizer, schedul
     x = x.to(opt['device'])
     y = y.to(opt['device'])
     
-    with torch.autocast(device_type='cuda', dtype=torch.float16, enabled=False):
+    with torch.autocast(device_type='cuda', dtype=torch.float16, enabled=opt['use_amp']):
         model_output = model(x)
         loss = F.mse_loss(model_output, y, reduction='none')
     
@@ -294,7 +294,7 @@ def train_model(model, dataset, opt):
     sec_passed = end_time-start_time
     mins = sec_passed / 60
     
-    if writer is not None:
+    if writer is not None and ("APMGSRN" in opt['model'] or "AMGSRN" in opt['model']):
         transform_params = model.get_transform_parameters()
         all_params = torch.cat([p['params'].flatten() for p in transform_params])
         fig, ax = plt.subplots()
@@ -446,6 +446,8 @@ if __name__ == '__main__':
         help='Save the difference between grids to improve compression.')
     parser.add_argument('--last_timestep_init',default=None, type=str2bool,
         help='Initialize the last timestep with the previous timestep.')
+    parser.add_argument('--error_volume',default=None, type=str2bool,
+        help='The volume being traind is an error volume.')
 
 
     args = vars(parser.parse_args())

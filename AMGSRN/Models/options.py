@@ -59,6 +59,7 @@ class Options():
         opt['log_image_every']                      = 0
         opt['log_image']                            = False
         opt['profile']                              = False
+        opt['error_volume']                         = False
         opt['use_amp']                              = False
         opt['compressor_used']                      = "none"
         opt['save_with_compression']                = True

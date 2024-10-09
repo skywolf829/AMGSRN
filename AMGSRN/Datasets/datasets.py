@@ -4,10 +4,10 @@ from AMGSRN.Other.utility_functions import make_coord_grid, nc_to_tensor
 import torch.nn.functional as F
 
 project_folder_path = os.path.dirname(os.path.abspath(__file__))
-project_folder_path = os.path.join(project_folder_path, "..", "..")
-data_folder = os.path.join(project_folder_path, "Data")
-output_folder = os.path.join(project_folder_path, "Output")
-save_folder = os.path.join(project_folder_path, "SavedModels")
+project_folder_path = os.path.abspath(os.path.join(project_folder_path, "..", ".."))
+data_folder = os.path.abspath(os.path.join(project_folder_path, "Data"))
+output_folder = os.path.abspath(os.path.join(project_folder_path, "Output"))
+save_folder = os.path.abspath(os.path.join(project_folder_path, "SavedModels"))
 
 class Dataset(torch.utils.data.Dataset):
     def __init__(self, opt):

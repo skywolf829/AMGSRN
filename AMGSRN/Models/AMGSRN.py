@@ -30,6 +30,7 @@ class AMGSRN(nn.Module):
         if(opt['requires_padded_feats']):
             self.padding_size : int = 16*int(math.ceil(max(1, (opt['n_grids']*opt['n_features'] )/16))) - \
                 opt['n_grids']*opt['n_features'] 
+        self.error_volume : bool = opt['error_volume']
 
         self.init_activations()
         self.randomize_grids(self.n_grids, self.n_features, 
@@ -97,6 +98,11 @@ class AMGSRN(nn.Module):
         self.register_buffer(
             "volume_max",
             torch.tensor([opt['data_max']], requires_grad=False, dtype=torch.float32),
+            persistent=False
+        )
+        self.register_buffer(
+            "max_magnitude",
+            torch.tensor([max(abs(opt['data_min']), abs(opt['data_max']))], requires_grad=False, dtype=torch.float32),
             persistent=False
         )
 
@@ -289,6 +295,10 @@ class AMGSRN(nn.Module):
     def forward(self, x : torch.Tensor) -> torch.Tensor:
         feats = encode(x, self.rotations, self.scales, self.translations, self.feature_grids)  
         y = self.decoder(feats)
-        y = y.float() * (self.volume_max - self.volume_min) + self.volume_min   
+        if not self.error_volume:   
+            y = y.float() * (self.volume_max - self.volume_min) + self.volume_min   
+        else:
+            y = y.float() * self.max_magnitude #normalize to prevent underflow
+
         return y
 

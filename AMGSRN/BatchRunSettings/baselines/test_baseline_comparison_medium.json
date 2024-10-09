@@ -1,0 +1,63 @@
+[   
+    
+    [ "test.py",
+    {        
+        "load_from": "mantle_fVSRN_medium",
+        "tests": "throughput,psnr"
+    }],
+    [ "test.py",
+    {        
+        "load_from": "mantle_NGP_medium",
+        "tests": "throughput,psnr"
+    }],
+    [ "test.py",
+    {        
+        "load_from": "mantle_AMGSRN_medium",
+        "tests": "throughput,psnr"
+    }],
+    [ "test.py",
+    {        
+        "load_from": "asteroid_fVSRN_medium",
+        "tests": "throughput,psnr"
+    }],
+    [ "test.py",
+    {        
+        "load_from": "asteroid_NGP_medium",
+        "tests": "throughput,psnr"
+    }],
+    [ "test.py",
+    {        
+        "load_from": "asteroid_AMGSRN_medium",
+        "tests": "throughput,psnr"
+    }],
+    [ "test.py",
+    {        
+        "load_from": "mixing_fVSRN_medium",
+        "tests": "throughput,psnr"
+    }],
+    [ "test.py",
+    {        
+        "load_from": "mixing_NGP_medium",
+        "tests": "throughput,psnr"
+    }],
+    [ "test.py",
+    {        
+        "load_from": "mixing_AMGSRN_medium",
+        "tests": "throughput,psnr"
+    }],
+    [ "test.py",
+    {        
+        "load_from": "supernova_fVSRN_medium",
+        "tests": "throughput,psnr"
+    }],
+    [ "test.py",
+    {        
+        "load_from": "supernova_NGP_medium",
+        "tests": "throughput,psnr"
+    }],
+    [ "test.py",
+    {        
+        "load_from": "supernova_AMGSRN_medium",
+        "tests": "throughput,psnr"
+    }]
+]

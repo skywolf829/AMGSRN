@@ -61,7 +61,7 @@ class NGP(nn.Module):
         pass
 
     def unload_timestep(self, timestep:int):
-        self.to('cpu')
+        pass
 
 
     def min(self):

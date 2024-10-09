@@ -208,16 +208,19 @@ def test_psnr_chunked(model, opt):
         #print(f"MSE: {MSE}, shape {full_shape}")
         y = 10 * torch.log10(MSE)
         y = 20.0 * torch.log10(data_max-data_min) - y
-    #print(f"Data min/max: {data_min}/{data_max}")
-    #print(f"PSNR: {y.item() : 0.03f}")
+    print(f"Data min/max: {data_min}/{data_max}")
+    print(f"SSE: {SSE}")
+    print(f"MSE: {MSE}")
+    print(f"PSNR: {y.item() : 0.03f}")
     opt['extents'] = init_extents
     opt['full_shape'] = full_shape
     return y.item()
 
-def error_volume(model, dataset, opt):
+def error_volume(model, opt):
     
-    
-    grid = list(dataset.data.shape[2:])
+    dataset = Dataset(opt)
+    data = dataset.data[dataset.default_timestep]
+    grid = list(data.shape[2:])
     
     
     with torch.no_grad():
@@ -228,8 +231,8 @@ def error_volume(model, dataset, opt):
     result = result.permute(3, 0, 1, 2).unsqueeze(0)
     create_path(os.path.join(output_folder, "ErrorVolume"))
     
-    result -= dataset.data
-    result **= 2
+    result -= data
+    #result **= 2
     tensor_to_cdf(result, 
         os.path.join(output_folder, "ErrorVolume",
         opt['save_name'] + "_error.nc"))
@@ -298,8 +301,9 @@ def test_throughput(model, opt):
     torch.cuda.reset_accumulated_memory_stats()
     torch.cuda.reset_peak_memory_stats()
 
-    input_data :torch.Tensor = torch.rand([batch, 3], device=opt['device'], dtype=torch.float32)
+    
     with torch.no_grad(), torch.autocast(device_type='cuda', dtype=torch.float16):
+        input_data :torch.Tensor = torch.rand([batch, 3], device=opt['device'], dtype=torch.float32)
         torch.cuda.synchronize()
         t0 = time.time()
         for i in range(num_forward):
