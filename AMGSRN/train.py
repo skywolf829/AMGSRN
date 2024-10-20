@@ -261,11 +261,11 @@ def train_model(model, dataset, opt):
                 betas=[opt['beta_1'], opt['beta_2']], 
                 eps = 1e-15
                 ),
-            optim.SGD(
+            optim.Adam(
                 model.get_transform_parameters(), 
-                #eps = 1e-15,
+                eps = 1e-15,
                 #betas=[opt['beta_1'], opt['beta_2']], 
-                momentum=0.9
+                #momentum=0.9
                 )
         ]        
         scheduler = [

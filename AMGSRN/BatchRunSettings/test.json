@@ -1,7 +1,7 @@
 [   
     [ "test.py",
     {        
-        "load_from": "mantle_AMGSRN_medium",
+        "load_from": "chameleon_cuda",
         "tests": "psnr"
     }]
 ]

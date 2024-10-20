@@ -46,9 +46,9 @@ class Options():
         opt['points_per_iteration']                 = 2**17
         opt['lr']                                   = 0.01
         opt['transform_lr']                         = 0.001
-        opt['scale_lr']                             = 1000
-        opt['translation_lr']                       = 1000
-        opt['rotation_lr']                          = 1000
+        opt['scale_lr']                             = 0.001 #1000 for SGD
+        opt['translation_lr']                       = 0.001 #1000
+        opt['rotation_lr']                          = 0.001 #1000
         opt['tv_weight']                            = 0.0001
         opt['grid_diff_weight']                     = 0
         opt['l1_regularization']                    = 0.000025
