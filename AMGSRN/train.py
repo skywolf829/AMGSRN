@@ -164,7 +164,6 @@ def train_step_APMGSRN(opt, iteration, batch, dataset, model, optimizer, schedul
             with record_function("density"):
                 density = model.feature_density(x)
                 density /= density.sum().detach()
-
             with record_function("target density"):
                 target = torch.exp(torch.log(density+1e-16) * \
                     (loss.mean()/(loss+1e-16)))
@@ -259,12 +258,14 @@ def train_model(model, dataset, opt):
             optim.Adam(
                 model.get_model_parameters(), 
                 lr=opt["lr"],
-                betas=[opt['beta_1'], opt['beta_2']], eps = 10e-15
+                betas=[opt['beta_1'], opt['beta_2']], 
+                eps = 1e-15
                 ),
-            optim.Adam(
+            optim.SGD(
                 model.get_transform_parameters(), 
-                lr=opt['transform_lr'],
-                betas=[opt['beta_1'], opt['beta_2']], eps = 10e-15
+                #eps = 1e-15,
+                #betas=[opt['beta_1'], opt['beta_2']], 
+                momentum=0.9
                 )
         ]        
         scheduler = [
@@ -276,6 +277,7 @@ def train_model(model, dataset, opt):
         optimizer = optim.Adam(model.parameters(), lr=opt["lr"], 
             betas=[opt['beta_1'], opt['beta_2']]) 
         scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=opt['iterations'])
+        #scheduler = torch.optim.lr_scheduler.LinearLR(optimizer, start_factor=1.0, end_factor=1.0, total_iters=opt['iterations'])
     
     scaler = torch.amp.GradScaler()
     

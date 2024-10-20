@@ -1,7 +1,7 @@
 [
     [ "train.py",
         {        
-            "save_name": "woodbranch_small_cuda",
+            "save_name": "woodbranch_cuda",
             "model": "AMGSRN",
             "data": "woodbranch.nc",
             "n_features": 2,
@@ -20,7 +20,7 @@
     }],
     [ "train.py",
         {        
-            "save_name": "woodbranch_small_pytorch",
+            "save_name": "woodbranch_pytorch",
             "model": "AMGSRN_pytorch",
             "data": "woodbranch.nc",
             "n_features": 2,
@@ -39,7 +39,7 @@
     }],
     [ "train.py",
         {        
-            "save_name": "chameleon_small_cuda",
+            "save_name": "chameleon_cuda",
             "model": "AMGSRN",
             "data": "chameleon.nc",
             "n_features": 2,
@@ -56,7 +56,7 @@
     }],
     [ "train.py",
         {        
-            "save_name": "chameleon_small_pytorch",
+            "save_name": "chameleon_pytorch",
             "model": "AMGSRN_pytorch",
             "data": "chameleon.nc",
             "n_features": 2,
@@ -73,7 +73,7 @@
     }],
     [ "train.py",
         {        
-            "save_name": "supernova_small_cuda",
+            "save_name": "supernova_cuda",
             "model": "AMGSRN",
             "data": "supernova1327.h5",
             "n_features": 2,
@@ -90,7 +90,7 @@
     }],
     [ "train.py",
         {        
-            "save_name": "supernova_small_pytorch",
+            "save_name": "supernova_pytorch",
             "model": "AMGSRN_pytorch",
             "data": "supernova1327.h5",
             "n_features": 2,
@@ -107,7 +107,7 @@
     }],
     [ "train.py",
         {        
-            "save_name": "asteroid_small_cuda",
+            "save_name": "asteroid_cuda",
             "model": "AMGSRN",
             "data": "asteroid_17602-076.nc",
             "n_features": 2,
@@ -124,7 +124,7 @@
     }],
     [ "train.py",
         {        
-            "save_name": "asteroid_small_pytorch",
+            "save_name": "asteroid_pytorch",
             "model": "AMGSRN_pytorch",
             "data": "asteroid_17602-076.nc",
             "n_features": 2,

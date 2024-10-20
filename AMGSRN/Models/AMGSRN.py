@@ -27,6 +27,9 @@ class AMGSRN(nn.Module):
         self.requires_padded_feats : bool = opt['requires_padded_feats']
         self.padding_size : int = 0
         self.full_shape = opt['full_shape']
+        self.scale_lr = opt['scale_lr']
+        self.translation_lr = opt['translation_lr']
+        self.rotation_lr = opt['rotation_lr']
         if(opt['requires_padded_feats']):
             self.padding_size : int = 16*int(math.ceil(max(1, (opt['n_grids']*opt['n_features'] )/16))) - \
                 opt['n_grids']*opt['n_features'] 
@@ -160,9 +163,9 @@ class AMGSRN(nn.Module):
         pass
 
     def get_transform_parameters(self):
-        return [{"params": self._rotations},
-                {"params": self._scales},
-                {"params": self.translations}]
+        return [{"params": self._rotations, "lr": self.rotation_lr},
+                {"params": self._scales, "lr": self.scale_lr},
+                {"params": self.translations, "lr": self.translation_lr}]
     
     def get_model_parameters(self):
         return [

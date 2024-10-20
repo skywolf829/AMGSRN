@@ -59,5 +59,21 @@
     {        
         "load_from": "supernova_AMGSRN_medium",
         "tests": "throughput,psnr"
+    }],
+    
+    [ "test.py",
+    {        
+        "load_from": "chameleon_fVSRN_medium",
+        "tests": "throughput,psnr"
+    }],
+    [ "test.py",
+    {        
+        "load_from": "chameleon_NGP_medium",
+        "tests": "throughput,psnr"
+    }],
+    [ "test.py",
+    {        
+        "load_from": "chameleon_AMGSRN_medium",
+        "tests": "throughput,psnr"
     }]
 ]
