@@ -161,6 +161,7 @@ def test_psnr_chunked(model, opt):
                     dataset.set_default_timestep(model.get_default_timestep())
                     dataset.load_timestep(model.get_default_timestep())
                     data = dataset.data[dataset.default_timestep]
+                    #print(f"Data shape: {data.shape}")
                     data = data[0].flatten(1,-1).permute(1,0)
                     
                     if(data_max is None):

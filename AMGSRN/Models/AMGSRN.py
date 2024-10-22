@@ -18,15 +18,26 @@ class AMGSRN(nn.Module):
         super(AMGSRN, self).__init__()
         
         self.n_grids : int = opt['n_grids']
-        self.n_features : int = opt['n_features'] 
-        self.feature_grid_shape : List[int] = [eval(i) for i in opt['feature_grid_shape'].split(',')]
+        self.n_features : int = opt['n_features']
+        self.full_shape = opt['full_shape']
+        if not opt['match_aspect_ratio']:
+            self.feature_grid_shape : List[int] = [eval(i) for i in opt['feature_grid_shape'].split(',')]
+        else:
+            input_feature_grid_shape = [eval(i) for i in opt['feature_grid_shape'].split(',')]
+            total_feats = math.prod(input_feature_grid_shape)
+            total_vertices = math.prod(self.full_shape)
+            ratio = (total_feats / total_vertices) ** (1/len(self.full_shape))
+            self.feature_grid_shape = [int(math.ceil(self.full_shape[i] * ratio)) for i in range(len(self.full_shape))]
+            print(f"Determined aspect ratio feature grid shape: {self.feature_grid_shape}")
+            opt['feature_grid_shape'] = ','.join(str(i) for i in self.feature_grid_shape)
+            opt['match_aspect_ratio'] = False
+
         self.n_dims : int = opt['n_dims']
         self.n_outputs : int = opt['n_outputs'] 
         self.nodes_per_layer : int = opt['nodes_per_layer']
         self.n_layers : int = opt['n_layers'] 
         self.requires_padded_feats : bool = opt['requires_padded_feats']
         self.padding_size : int = 0
-        self.full_shape = opt['full_shape']
         self.scale_lr = opt['scale_lr']
         self.translation_lr = opt['translation_lr']
         self.rotation_lr = opt['rotation_lr']

@@ -360,6 +360,8 @@ if __name__ == '__main__':
         help='For the fourier featuers, whether to use the global position or local.')
     parser.add_argument('--use_tcnn_if_available',default=None,type=str2bool,
         help='Whether to use TCNN if available on the machine training.')
+    parser.add_argument('--match_aspect_ratio',default=None,type=str2bool,
+        help='Whether to match the aspect ratio of the feature grid to the data.')
     
     # Hash Grid (NGP model) hyperparameters
     parser.add_argument('--hash_log2_size',default=None,type=int,

@@ -35,6 +35,7 @@ class Options():
         opt['nodes_per_layer']                      = 64
         opt['interpolate']                          = True
         opt['requires_padded_feats']                = False
+        opt['match_aspect_ratio']                   = True
         
         opt['iters_to_train_new_layer']             = 1000
         opt['iters_since_new_layer']                = 0

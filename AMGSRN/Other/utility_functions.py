@@ -445,6 +445,8 @@ def nc_to_tensor(location, opt = None):
             #print(f"Loading data with extents {opt['extents']}")
             ext = opt['extents'].split(',')
             ext = [eval(i) for i in ext]
+            print(f"Loading extents: {ext}")
+            print(f"Data shape: {f[a].shape}")
             d = np.array(f[a][ext[0]:ext[1],ext[2]:ext[3],ext[4]:ext[5]])
         channels.append(d)
     d = np.stack(channels)

@@ -2,78 +2,93 @@
     
     [ "test.py",
     {        
-        "load_from": "mantle_fVSRN_medium",
+        "load_from": "mantle_fVSRN_small",
         "tests": "throughput,psnr"
     }],
     [ "test.py",
     {        
-        "load_from": "mantle_NGP_medium",
+        "load_from": "mantle_NGP_small",
         "tests": "throughput,psnr"
     }],
     [ "test.py",
     {        
-        "load_from": "mantle_AMGSRN_medium",
+        "load_from": "mantle_AMGSRN_small",
         "tests": "throughput,psnr"
     }],
     [ "test.py",
     {        
-        "load_from": "asteroid_fVSRN_medium",
+        "load_from": "asteroid_fVSRN_small",
         "tests": "throughput,psnr"
     }],
     [ "test.py",
     {        
-        "load_from": "asteroid_NGP_medium",
+        "load_from": "asteroid_NGP_small",
         "tests": "throughput,psnr"
     }],
     [ "test.py",
     {        
-        "load_from": "asteroid_AMGSRN_medium",
+        "load_from": "asteroid_AMGSRN_small",
         "tests": "throughput,psnr"
     }],
     [ "test.py",
     {        
-        "load_from": "mixing_fVSRN_medium",
+        "load_from": "mixing_fVSRN_small",
         "tests": "throughput,psnr"
     }],
     [ "test.py",
     {        
-        "load_from": "mixing_NGP_medium",
+        "load_from": "mixing_NGP_small",
         "tests": "throughput,psnr"
     }],
     [ "test.py",
     {        
-        "load_from": "mixing_AMGSRN_medium",
+        "load_from": "mixing_AMGSRN_small",
         "tests": "throughput,psnr"
     }],
     [ "test.py",
     {        
-        "load_from": "supernova_fVSRN_medium",
+        "load_from": "supernova_fVSRN_small",
         "tests": "throughput,psnr"
     }],
     [ "test.py",
     {        
-        "load_from": "supernova_NGP_medium",
+        "load_from": "supernova_NGP_small",
         "tests": "throughput,psnr"
     }],
     [ "test.py",
     {        
-        "load_from": "supernova_AMGSRN_medium",
+        "load_from": "supernova_AMGSRN_small",
         "tests": "throughput,psnr"
     }],
     
     [ "test.py",
     {        
-        "load_from": "chameleon_fVSRN_medium",
+        "load_from": "chameleon_fVSRN_small",
         "tests": "throughput,psnr"
     }],
     [ "test.py",
     {        
-        "load_from": "chameleon_NGP_medium",
+        "load_from": "chameleon_NGP_small",
         "tests": "throughput,psnr"
     }],
     [ "test.py",
     {        
-        "load_from": "chameleon_AMGSRN_medium",
+        "load_from": "chameleon_AMGSRN_small",
         "tests": "throughput,psnr"
+    }],
+    [ "test.py",
+    {        
+        "load_from": "isotropic_NGP_small",
+        "tests": "psnr"
+    }],
+    [ "test.py",
+    {        
+        "load_from": "isotropic_fVSRN_small",
+        "tests": "psnr"
+    }],
+    [ "test.py",
+    {        
+        "load_from": "isotropic_AMGSRN_small",
+        "tests": "psnr"
     }]
 ]

@@ -163,8 +163,8 @@ def parse_devices(devices_text):
 
 def main():
     parser = argparse.ArgumentParser(description='Trains models given settings on available gpus')
-    parser.add_argument('settings', type=str,
-        help='The settings file with options for each model to train')
+    parser.add_argument('settings', type=str, nargs='+',
+        help='One or more settings files with options for each model to train')
     parser.add_argument('--devices',default="all",type=str,
         help='Which [cuda] devices(s) to train on, separated with commas. Default: all, which uses all available CUDA devices')
     # devices can also be the indices of the GPUS, ex: "0,1,2,4,5,7" or it can simply be "cpu"
@@ -173,8 +173,16 @@ def main():
     
     args = vars(parser.parse_args())
 
-    settings_path = os.path.join(project_folder_path, "AMGSRN", "BatchRunSettings", args['settings'])
-    command_names, commands, log_locations = build_commands(settings_path)
+    command_names = []
+    commands = []
+    log_locations = []
+
+    for settings_file in args['settings']:
+        settings_path = os.path.join(project_folder_path, "AMGSRN", "BatchRunSettings", settings_file)
+        names, cmds, logs = build_commands(settings_path)
+        command_names.extend(names)
+        commands.extend(cmds)
+        log_locations.extend(logs)
 
     if(args['devices'] == "all"):
         available_devices = []
