@@ -6,7 +6,7 @@
             "data": "mantle_55.nc",
             "n_features": 1,
             "n_grids": 32,
-            "feature_grid_shape": "80,80,80",
+            "feature_grid_shape": "64,64,128",
             "n_layers": 2,
             "nodes_per_layer": 64,
             "log_every": 100,

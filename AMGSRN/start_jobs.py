@@ -98,7 +98,7 @@ def build_commands(settings_path, offset=0):
                         z_end = min(full_shape[2], z_end+ghost_cells)
                         extents = f"{x_start},{x_end},{y_start},{y_end},{z_start},{z_end}"
 
-                        run_name = str(run_number)
+                        run_name = str(run_number + offset)
 
                         command_names.append(run_name)           
                         command = "python AMGSRN/" + str(script_name) + " "
@@ -126,7 +126,7 @@ def build_commands(settings_path, offset=0):
                             create_path(os.path.join(save_folder, variables["load_from"]))
                         run_number += 1
         else:            
-            run_name = str(run_number)
+            run_name = str(run_number + offset)
             command_names.append(run_name)           
             command = "python AMGSRN/" + str(script_name) + " "
             
