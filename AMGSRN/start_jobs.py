@@ -25,7 +25,7 @@ Settings files to run are in /AMGSRN/BatchRunSettings/
 
 # Parses the settings JSON into a list of 
 # shell commands to fire off
-def build_commands(settings_path):
+def build_commands(settings_path, offset=0):
     f = open(settings_path)
     data = json.load(f)
     f.close()
@@ -42,7 +42,7 @@ def build_commands(settings_path):
         if("test" in script_name and "all" == variables['load_from']):
             all_saves = os.listdir(save_folder)
             for fold in all_saves:
-                run_name = str(run_number)
+                run_name = str(run_number + offset)
                 command_names.append(run_name)        
                 
                 command_string = "python AMGSRN/" + str(script_name) + " --load_from " + fold + " " + \
@@ -179,7 +179,7 @@ def main():
 
     for settings_file in args['settings']:
         settings_path = os.path.join(project_folder_path, "AMGSRN", "BatchRunSettings", settings_file)
-        names, cmds, logs = build_commands(settings_path)
+        names, cmds, logs = build_commands(settings_path, offset=len(command_names))
         command_names.extend(names)
         commands.extend(cmds)
         log_locations.extend(logs)
