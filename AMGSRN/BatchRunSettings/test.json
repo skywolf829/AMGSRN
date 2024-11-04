@@ -1,7 +1,12 @@
 [   
     [ "test.py",
-    {        
-        "load_from": "mantle_AMGSRN_large",
-        "tests": "psnr"
+        {        
+        "load_from": "AMGSRN_pytorch_throughput",
+        "tests": "throughput"
+    }],
+    [ "test.py",
+        {        
+        "load_from": "AMGSRN_throughput",
+        "tests": "throughput"
     }]
 ]

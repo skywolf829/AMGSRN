@@ -1,19 +1,36 @@
 [
     [ "train.py",
         {        
-            "save_name": "mantle_AMGSRN_large",
+            "save_name": "AMGSRN_throughput",
             "model": "AMGSRN",
-            "data": "mantle_55.nc",
+            "data": "supernova1327.h5",
             "n_features": 1,
             "n_grids": 32,
-            "feature_grid_shape": "64,64,128",
+            "feature_grid_shape": "32,32,32",
             "n_layers": 2,
             "nodes_per_layer": 64,
             "log_every": 100,
             "lr": 0.01,
             "iterations": 30000,
             "save_with_compression": false,
-            "tv_weight": 0,
-            "l1_regularization": 0
+            "l1_regularization": 0.0,
+            "tv_weight": 0.0
+    }],
+    [ "train.py",
+        {        
+            "save_name": "AMGSRN_pytorch_throughput",
+            "model": "AMGSRN_pytorch",
+            "data": "supernova1327.h5",
+            "n_features": 1,
+            "n_grids": 32,
+            "feature_grid_shape": "32,32,32",
+            "n_layers": 2,
+            "nodes_per_layer": 64,
+            "log_every": 100,
+            "lr": 0.01,
+            "iterations": 30000,
+            "save_with_compression": false,
+            "l1_regularization": 0.0,
+            "tv_weight": 0.0
     }]
 ]

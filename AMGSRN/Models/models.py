@@ -98,7 +98,7 @@ def save_model(model,opt):
 
     with torch.no_grad():
         folder = create_folder(save_folder, opt["save_name"])
-        path_to_save = os.path.join(save_folder, folder)
+        path_to_save = os.path.abspath(os.path.join(save_folder, folder))
         
         if(not opt['save_with_compression']):
             state_dict = model.state_dict()
@@ -130,16 +130,17 @@ def save_model(model,opt):
                         compressed_path = os.path.join(temp_dir, f"feature_grid_{j}.sz")
                         command = f"sz3 -f -z {compressed_path} -i {grid_path} -M ABS {bound:0.20f} {dim_flag}"
                         subprocess.run(command, check=True)
-
-                        #decompress and get error to not accumulate error
-                        decompressed_path = os.path.join(temp_dir, f"feature_grid_{j}.out")
-                        command = f"sz3 -x -f -z {compressed_path} -o {decompressed_path} {dim_flag}"
-                        subprocess.run(command, check=True)
-                        decompressed_data = np.fromfile(decompressed_path, dtype=np.float32).reshape(grid.shape)
-                        error = grid - decompressed_data
-                        last_grid_error[:,j] = error
+                        if(i > 0 and opt['save_grid_diffs']):
+                            #decompress and get error to not accumulate error
+                            decompressed_path = os.path.join(temp_dir, f"feature_grid_{j}.out")
+                            command = f"sz3 -x -f -z {compressed_path} -o {decompressed_path} {dim_flag}"
+                            subprocess.run(command, check=True)
+                            decompressed_data = np.fromfile(decompressed_path, dtype=np.float32).reshape(grid.shape)
+                            error = grid - decompressed_data
+                            last_grid_error[:,j] = error
+                            os.remove(decompressed_path)
                         os.remove(grid_path)
-                        os.remove(decompressed_path)
+                        
                     # Save the rest of the model losslessly
                     for key, tensor in state_dict.items():
                         if key != 'feature_grids':
@@ -185,15 +186,15 @@ def save_model(model,opt):
                 feature_grids = state_dict['feature_grids'].cpu().numpy().astype(np.float32)
                 for i in range(feature_grids.shape[1]): # iterate over each channel
                     grid = feature_grids[:, i]
-                    grid_path = os.path.join(temp_dir, f"feature_grid_{i}.raw")
+                    grid_path = os.path.abspath(os.path.join(temp_dir, f"feature_grid_{i}.raw"))
                     grid.tofile(grid_path)
                     
                     dims = ' '.join(str(d) for d in list(grid.shape)[::-1])
                     dim_flag = f"-{len(grid.shape)} {dims}"
                     
-                    compressed_path = os.path.join(temp_dir, f"feature_grid_{i}.sz")
+                    compressed_path = os.path.abspath(os.path.join(temp_dir, f"feature_grid_{i}.sz"))
                     command = f"sz3 -f -z {compressed_path} -i {grid_path} -M ABS {bound:0.20f} {dim_flag}"
-                    subprocess.run(command, check=True)
+                    subprocess.run(command.split(" "), check=True)
                     
                     # Remove the raw file
                     os.remove(grid_path)

@@ -1,0 +1,23 @@
+[   
+    
+    [ "test.py",
+    {        
+        "load_from": "NGP_throughput",
+        "tests": "throughput"
+    }],
+    [ "test.py",
+    {        
+        "load_from": "fVSRN_throughput",
+        "tests": "throughput"
+    }],
+    [ "test.py",
+    {        
+        "load_from": "AMGSRN_throughput",
+        "tests": "throughput"
+    }],
+    [ "test.py",
+    {        
+        "load_from": "AMGSRN_pytorch_throughput",
+        "tests": "throughput"
+    }]
+]

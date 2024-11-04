@@ -829,7 +829,14 @@ if __name__ == '__main__':
         default="render.png",
         type=str,
         help="The save name for the rendered image."
+    ) 
+    parser.add_argument(
+        '--gt_path',
+        default=None,
+        type=str,
+        help="The path to the ground truth image."
     )
+    
     
     # rendering args ********* <-
     
@@ -930,16 +937,17 @@ if __name__ == '__main__':
     from imageio import imsave, imread
     from Other.utility_functions import PSNR, ssim
     
-    gt_im = torch.tensor(imread(os.path.join(output_folder, "gt.png")),dtype=torch.float32)/255
-    img = img.cpu()
-    p = PSNR(img, gt_im)
-    s = ssim(img.permute(2,0,1).unsqueeze(0), gt_im.permute(2,0,1).unsqueeze(0))
-    print(f"PSNR (image): {p:0.03f} dB")
-    print(f"SSIM (image): {s: 0.03f} ")
+    if(args['gt_path'] is not None):
+        gt_im = torch.tensor(imread(args['gt_path']),dtype=torch.float32)/255
+        img = img.cpu()
+        p = PSNR(img, gt_im)
+        s = ssim(img.permute(2,0,1).unsqueeze(0), gt_im.permute(2,0,1).unsqueeze(0))
+        print(f"PSNR (image): {p:0.03f} dB")
+        print(f"SSIM (image): {s: 0.03f} ")
+        
     
     
-    
-    timesteps = 10
+    timesteps = 1
     times = np.zeros([timesteps])
     for i in range(timesteps):
         torch.cuda.empty_cache()

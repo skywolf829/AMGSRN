@@ -4,75 +4,66 @@ import matplotlib.pyplot as plt
 import glob
 import numpy as np
 
-# Set the style for a clean and modern look
-plt.style.use('bmh')  # Use a valid style name
-font_size = 60
-line_width = 5
-point_size = 200
+# Setup data structures
+colors = ['blue', 'red', 'green', 'orange', 'purple', 'brown']
+markers = ['o', 's', '^', 'D', 'v', '<']
 
-# Function to create charts for each dataset
-def create_charts(file_path):
+# Set larger font sizes
+plt.rcParams.update({'font.size': 20})
+
+# Create figure with 3x2 subplots
+fig, axes = plt.subplots(3, 2, figsize=(10, 15))
+axes = axes.flatten()
+
+# Get all _avg.csv files in the CompressionResults directory
+csv_files = glob.glob(os.path.join('Output', 'CompressionResults', '*_avg.csv'))
+
+# Process each CSV file
+for dataset_idx, file_path in enumerate(csv_files):
     # Read CSV file
     df = pd.read_csv(file_path)
     
     # Extract dataset name from file name, remove extension and trailing numbers
     dataset_name = os.path.basename(file_path).split('_')[0].split('.')[0].rstrip('0123456789')
     
-    # Define a color palette
-    colors = plt.cm.tab10(np.linspace(0, 1, len(df['Compressor'].unique())))
-    
-    # Create PSNR vs Compression Ratio chart
-    plt.figure(figsize=(20, 14))
-    
-    for i, compressor in enumerate(df['Compressor'].unique()):
+    # PSNR vs Compression Ratio chart (left column)
+    ax_psnr = axes[dataset_idx * 2]
+    for comp_idx, compressor in enumerate(df['Compressor'].unique()):
         data = df[df['Compressor'] == compressor]
-        plt.scatter(data['Compression Ratio'], data['PSNR'], label=compressor, s=point_size, color=colors[i])
-        plt.plot(data['Compression Ratio'], data['PSNR'], linewidth=line_width, color=colors[i])
+        ax_psnr.semilogx(data['Compression Ratio'], data['PSNR'], 
+                        color=colors[comp_idx], marker=markers[comp_idx],
+                        label=compressor, linestyle='-', markersize=8)
     
-    plt.xscale('log')
-    plt.xlabel('Compression Ratio', fontsize=font_size)
-    plt.ylabel('PSNR (dB)', fontsize=font_size)
-    plt.title(f'{dataset_name.capitalize()}', fontsize=font_size*2, fontweight='bold')
-    plt.legend(fontsize=font_size)
-    #plt.grid(True, which="both", ls="-", alpha=0.4)
-    plt.tick_params(axis='both', which='major', labelsize=font_size)
-    plt.gca().invert_xaxis()
-    plt.gca().set_facecolor('#f8f8f8')
-    plt.tight_layout()
-    
-    output_dir = os.path.join('Output', 'CompressionCharts')
-    os.makedirs(output_dir, exist_ok=True)
-    plt.savefig(os.path.join(output_dir, f'{dataset_name}_compression_quality_chart.png'), dpi=300, bbox_inches='tight')
-    plt.close()
+    ax_psnr.set_title(f"{dataset_name.capitalize()} - PSNR", fontsize=22)
+    ax_psnr.set_xlabel('Compression Ratio', fontsize=20)
+    ax_psnr.set_ylabel('PSNR (dB)', fontsize=20)
+    ax_psnr.grid(True)
+    ax_psnr.legend(fontsize=18)
+    ax_psnr.tick_params(axis='both', which='major', labelsize=18)
+    ax_psnr.invert_xaxis()
 
-    # Create Compression Time vs Compression Ratio chart
-    plt.figure(figsize=(20, 14))
-    
-    for i, compressor in enumerate(df['Compressor'].unique()):
+    # Compression Time vs Compression Ratio chart (right column)
+    ax_time = axes[dataset_idx * 2 + 1]
+    for comp_idx, compressor in enumerate(df['Compressor'].unique()):
         data = df[df['Compressor'] == compressor]
-        plt.scatter(data['Compression Ratio'], data['Compression Time (s)'], label=compressor, s=point_size, color=colors[i])
-        plt.plot(data['Compression Ratio'], data['Compression Time (s)'], linewidth=line_width, color=colors[i])
+        ax_time.loglog(data['Compression Ratio'], data['Compression Time (s)'],
+                      color=colors[comp_idx], marker=markers[comp_idx],
+                      label=compressor, linestyle='-', markersize=8)
     
-    plt.xscale('log')
-    plt.yscale('log')
-    plt.xlabel('Compression Ratio', fontsize=font_size)
-    plt.ylabel('Compression Time (s)', fontsize=font_size)
-    #plt.title(f'Compression Time vs Compression Ratio for {dataset_name}', fontsize=font_size, fontweight='bold')
-    #plt.legend(fontsize=font_size)
-    #plt.grid(True, which="both", ls="-", alpha=0.4)
-    plt.tick_params(axis='both', which='major', labelsize=font_size)
-    plt.gca().invert_xaxis()
-    plt.gca().set_facecolor('#f8f8f8')
-    plt.tight_layout()
-    
-    plt.savefig(os.path.join(output_dir, f'{dataset_name}_compression_time_chart.png'), dpi=300, bbox_inches='tight')
-    plt.close()
+    ax_time.set_title(f"{dataset_name.capitalize()} - Time", fontsize=22)
+    ax_time.set_xlabel('Compression Ratio', fontsize=20)
+    ax_time.set_ylabel('Compression Time (s)', fontsize=20)
+    ax_time.grid(True)
+    ax_time.legend(fontsize=18)
+    ax_time.tick_params(axis='both', which='major', labelsize=18)
+    ax_time.invert_xaxis()
 
-# Get all _avg.csv files in the CompressionResults directory
-csv_files = glob.glob(os.path.join('Output', 'CompressionResults', '*_avg.csv'))
+plt.tight_layout()
 
-# Create charts for each CSV file
-for file_path in csv_files:
-    create_charts(file_path)
+# Create output directory and save figure
+output_dir = os.path.join('Output', 'CompressionCharts')
+os.makedirs(output_dir, exist_ok=True)
+plt.savefig(os.path.join(output_dir, 'compression_comparison.png'), dpi=300, bbox_inches='tight')
+plt.close()
 
-print(f"High-resolution charts have been generated and saved in the Output/CompressionCharts directory.")
+print(f"High-resolution comparison chart has been generated and saved in the Output/CompressionCharts directory.")
