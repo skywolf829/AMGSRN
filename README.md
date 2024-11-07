@@ -54,7 +54,7 @@ The renderer provides an interactive visualization interface with the following 
 
 For detailed renderer usage, see `AMGSRN/UI/README.md`.
 
-[![Time varying visualization](https://youtu.be/gesEli7F_JQ)](https://youtu.be/gesEli7F_JQ)
+[![YouTube video - time varying visualization](https://youtu.be/gesEli7F_JQ)](https://youtu.be/gesEli7F_JQ)
 
 
 ### Contributing
