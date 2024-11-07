@@ -1,6 +1,6 @@
 # AMGSRN++ - Advanced Adaptive Multi-Grid Scene Representation Networks
 
-![AMGSRN++](./figures/renders.jpg)
+![AMGSRN++](AMGSRN/figures/renders.jpg)
 
 AMGSRN++ builds upon and improves the [APMGSRN](https://github.com/skywolf829/APMGSRN) architecture with CUDA kernels, compression aware training, feature grid compression, and time-varying support.
 The CUDA kernels are implemented in another repository: [AMG_Encoder](https://github.com/skywolf829/AMG_Encoder).
@@ -54,7 +54,8 @@ The renderer provides an interactive visualization interface with the following 
 
 For detailed renderer usage, see `AMGSRN/UI/README.md`.
 
-[Youtube Demo](https://youtu.be/gesEli7F_JQ)
+[![Time varying visualization](https://youtu.be/gesEli7F_JQ)](https://youtu.be/gesEli7F_JQ)
+
 
 ### Contributing
 Contributions are welcome! Please feel free to submit pull requests.
