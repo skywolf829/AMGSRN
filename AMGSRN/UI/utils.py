@@ -24,7 +24,6 @@ class Arcball():
         self.coi_translate = np.eye(4, dtype=np.float32)
         self.coi_translate[:3, 3] = -coi
         self.aabb = scene_aabb
-        self.coaabb = scene_aabb.reshape(2, 3).mean(0)
         self.dist = dist
         self.aabb = scene_aabb.astype(dtype=np.float32)
         self.vMat = np.eye(4, dtype=np.float32)
@@ -47,6 +46,9 @@ class Arcball():
     def get_coi(self) -> np.ndarray:
         return self.coi
     
+    def set_aabb(self, aabb):
+        self.aabb = aabb
+
     def get_cam_dir(self) -> np.ndarray:
         return normalize_vec(self.coi - self.position())
     
@@ -80,11 +82,11 @@ class Arcball():
         use absolution zoom amount when far away,
         but when close to COI, approach COI with proportional distance
         '''
-        cam_dir = self.get_cam_dir()
+        #print(self.aabb)
         abs_translation = self.aabb.max()/10
         proportion_translation = self.translation[2, 3]/20
         trans = np.minimum(np.abs(abs_translation), np.abs(proportion_translation))
-        # print(abs_translation, proportion_translation, trans)
+        #print(abs_translation, proportion_translation, trans, delta)
         trans = -trans if delta < 0 else trans
         self.translation[2, 3] -= trans
         self.update_vMat()

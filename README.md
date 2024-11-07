@@ -54,6 +54,8 @@ The renderer provides an interactive visualization interface with the following 
 
 For detailed renderer usage, see `AMGSRN/UI/README.md`.
 
+[Youtube Demo](https://youtu.be/gesEli7F_JQ)
+
 ### Contributing
 Contributions are welcome! Please feel free to submit pull requests.
 

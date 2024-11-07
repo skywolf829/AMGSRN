@@ -828,6 +828,10 @@ class RendererThread(QObject):
                 self.full_shape[1]-1,
                 self.full_shape[2]-1
                 ])
+        self.camera.set_aabb(np.array([0,0,0,
+                                       self.full_shape[0]-1,
+                                       self.full_shape[1]-1,
+                                       self.full_shape[2]-1]))
         #self.scene.precompute_occupancy_grid()
         print(f"Min/max: {self.model.min().item():0.02f}/{self.model.max().item():0.02f}")
         print(f"Setting timestep max")
