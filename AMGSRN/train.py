@@ -174,10 +174,13 @@ def train_step_APMGSRN(opt, iteration, batch, dataset, model, optimizer, schedul
                     torch.log(target.detach()+1e-16), reduction='none', 
                     log_target=True)
                 # density_loss = F.mse_loss(density, target.detach())
-
-
-        with record_function("density_loss backward"):
-            scaler.scale(density_loss.mean()).backward()
+            # with record_function("scale_loss"):
+            #     scale_loss = 0.000005*model.scale_activation(model._scales)    
+            # with record_function("transform_loss"):
+            #     transform_loss = 0.000001*model.translations.norm(dim=1).mean()
+        grids_loss = density_loss.mean() #+ scale_loss.mean() + transform_loss.mean()
+        with record_function("grids_loss backward"):
+            scaler.scale(grids_loss).backward()
         
         with record_function("transform params step"):
             scaler.step(optimizer[1])

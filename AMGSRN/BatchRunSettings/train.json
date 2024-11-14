@@ -1,36 +1,18 @@
 [
     [ "train.py",
         {        
-            "save_name": "AMGSRN_throughput",
+            "save_name": "asteroid_AMGSRN_medium",
             "model": "AMGSRN",
-            "data": "supernova1327.h5",
+            "data": "asteroid_17602-076.nc",
             "n_features": 1,
             "n_grids": 32,
             "feature_grid_shape": "32,32,32",
             "n_layers": 2,
             "nodes_per_layer": 64,
+            "log_features_every": 100,
             "log_every": 100,
             "lr": 0.01,
             "iterations": 30000,
-            "save_with_compression": false,
-            "l1_regularization": 0.0,
-            "tv_weight": 0.0
-    }],
-    [ "train.py",
-        {        
-            "save_name": "AMGSRN_pytorch_throughput",
-            "model": "AMGSRN_pytorch",
-            "data": "supernova1327.h5",
-            "n_features": 1,
-            "n_grids": 32,
-            "feature_grid_shape": "32,32,32",
-            "n_layers": 2,
-            "nodes_per_layer": 64,
-            "log_every": 100,
-            "lr": 0.01,
-            "iterations": 30000,
-            "save_with_compression": false,
-            "l1_regularization": 0.0,
-            "tv_weight": 0.0
+            "save_with_compression": true
     }]
 ]

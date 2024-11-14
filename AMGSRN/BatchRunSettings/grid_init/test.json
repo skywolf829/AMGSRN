@@ -1,0 +1,17 @@
+[   
+    [ "test.py",
+        {        
+        "load_from": "supernova_init_large",
+        "tests": "psnr"
+    }],
+    [ "test.py",
+        {        
+        "load_from": "supernova_init_default",
+        "tests": "psnr"
+    }],
+    [ "test.py",
+        {        
+        "load_from": "supernova_init_small",
+        "tests": "psnr"
+    }]
+]

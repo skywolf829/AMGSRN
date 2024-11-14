@@ -484,7 +484,7 @@ def sample_grid(model, grid, align_corners:bool = False,
     return vals
 
 def forward_maxpoints(model, coords, out_dim=1, max_points=100000, 
-                      data_device="cuda", device="cuda"):
+                      data_device="cuda", device="cuda", unsqueeze=False):
     output_shape = list(coords.shape)
     output_shape[-1] = out_dim
     output = torch.empty(output_shape, 
@@ -492,7 +492,11 @@ def forward_maxpoints(model, coords, out_dim=1, max_points=100000,
         device=data_device)
     
     for start in range(0, coords.shape[0], max_points):
-        output[start:min(start+max_points, coords.shape[0])] = \
-            model(coords[start:min(start+max_points, coords.shape[0])].to(device)).to(data_device)
+        if unsqueeze:
+            output[start:min(start+max_points, coords.shape[0])] = \
+                model(coords[start:min(start+max_points, coords.shape[0])].to(device)).unsqueeze(1).to(data_device)
+        else:
+            output[start:min(start+max_points, coords.shape[0])] = \
+                model(coords[start:min(start+max_points, coords.shape[0])].to(device)).to(data_device)
     return output
 

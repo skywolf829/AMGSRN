@@ -1,12 +1,7 @@
 [   
     [ "test.py",
         {        
-        "load_from": "AMGSRN_pytorch_throughput",
-        "tests": "throughput"
-    }],
-    [ "test.py",
-        {        
-        "load_from": "AMGSRN_throughput",
-        "tests": "throughput"
+        "load_from": "asteroid_AMGSRN_medium",
+        "tests": "feature_density,psnr"
     }]
 ]

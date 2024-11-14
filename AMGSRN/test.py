@@ -333,16 +333,16 @@ def feature_density(model, opt):
     
     create_path(os.path.join(output_folder, "FeatureDensity"))
     
-    data_shape = list(dataset.data.shape[2:])
+    data_shape = list(dataset.data[dataset.default_timestep].shape[2:])
     grid = make_coord_grid(data_shape, opt['device'], 
                            flatten=True, align_corners=opt['align_corners'])
     with torch.no_grad():
-        print(grid.device)
         
         density = forward_maxpoints(model.feature_density, grid, 
                                     data_device=opt['data_device'], 
                                     device=opt['device'],
-                                    max_points=1000000)
+                                    max_points=2**24, unsqueeze=True)
+        print(density.shape)
         density = density.reshape(data_shape)
         density = density.unsqueeze(0).unsqueeze(0)
         density = density / density.sum()
@@ -351,28 +351,28 @@ def feature_density(model, opt):
             os.path.join(output_folder, 
             "FeatureDensity", opt['save_name']+"_density.nc"))
         
-        result = sample_grid(model, list(dataset.data.shape[2:]), 
-                             max_points=1000000,
-                             device=opt['device'],
-                             data_device=opt['data_device'])
-        result = result.to(opt['data_device'])
-        result = result.permute(3, 0, 1, 2).unsqueeze(0)
-        result -= dataset.data
-        result **= 2
-        result /= result.mean()
-        result = torch.exp(torch.log(density+1e-16) / torch.exp(result))
-        result /= result.sum()
-        tensor_to_cdf(result, 
-            os.path.join(output_folder, 
-            "FeatureDensity", opt['save_name']+"_targetdensity.nc"))     
+        # result = sample_grid(model, list(dataset.data.shape[2:]), 
+        #                      max_points=1000000,
+        #                      device=opt['device'],
+        #                      data_device=opt['data_device'])
+        # result = result.to(opt['data_device'])
+        # result = result.permute(3, 0, 1, 2).unsqueeze(0)
+        # result -= dataset.data
+        # result **= 2
+        # result /= result.mean()
+        # result = torch.exp(torch.log(density+1e-16) / torch.exp(result))
+        # result /= result.sum()
+        # tensor_to_cdf(result, 
+        #     os.path.join(output_folder, 
+        #     "FeatureDensity", opt['save_name']+"_targetdensity.nc"))     
         
-        result = F.kl_div(torch.log(density+1e-16), 
-                          torch.log(result+1e-16), 
-                               reduction="none", 
-                               log_target=True)           
-        tensor_to_cdf(result, 
-            os.path.join(output_folder, 
-            "FeatureDensity", opt['save_name']+"_kl.nc"))    
+        # result = F.kl_div(torch.log(density+1e-16), 
+        #                   torch.log(result+1e-16), 
+        #                        reduction="none", 
+        #                        log_target=True)           
+        # tensor_to_cdf(result, 
+        #     os.path.join(output_folder, 
+        #     "FeatureDensity", opt['save_name']+"_kl.nc"))    
         
 def feature_locations(model, opt):
     if(opt['model'] == "afVSRN"):

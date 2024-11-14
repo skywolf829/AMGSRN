@@ -5,7 +5,8 @@ import json
 import time
 import subprocess
 import shlex
-from AMGSRN.Other.utility_functions import create_path, nc_to_tensor, tensor_to_cdf, make_coord_grid, npy_to_cdf
+from AMGSRN.Other.utility_functions import create_path, nc_to_tensor, \
+    tensor_to_cdf, make_coord_grid, npy_to_cdf
 import h5py
 import numpy as np
 
@@ -469,5 +470,7 @@ def woodbranch():
 
 if __name__ == '__main__':
     
-    woodbranch()
+    data, _ = nc_to_tensor(os.path.join(data_folder, "supernova1327.h5"))
+    print(data.shape)
+    tensor_to_cdf(data, "supernova1327.nc")
     quit()
